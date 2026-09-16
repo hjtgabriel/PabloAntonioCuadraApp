@@ -13,6 +13,7 @@ describir sus columnas, sus campos de formulario y qué servicio invocar.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -26,6 +27,8 @@ from vistas.componentes.layout import pantalla_con_boton
 from vistas.componentes.notificaciones import avisar_error, avisar_exito
 from vistas.componentes.registros import leer_valor
 from vistas.componentes.tablas import Columna, TablaDatos
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -134,8 +137,9 @@ class PantallaCrud:
         if self._config.crear is None:
             return
 
-        self._pagina.show_dialog(
-            DialogoFormulario(
+        self._abrir_dialogo(
+            lambda: DialogoFormulario(
+                self._pagina,
                 f"Nuevo · {self._config.entidad}",
                 self._config.construir_campos(None),
                 self._guardar_alta,
@@ -167,8 +171,9 @@ class PantallaCrud:
             return
 
         identificador = leer_valor(registro, self._config.clave_id)
-        self._pagina.show_dialog(
-            DialogoFormulario(
+        self._abrir_dialogo(
+            lambda: DialogoFormulario(
+                self._pagina,
                 f"Editar · {self._config.entidad}",
                 self._config.construir_campos(registro),
                 lambda datos: self._guardar_edicion(identificador, datos),
@@ -201,8 +206,9 @@ class PantallaCrud:
             return
 
         identificador = leer_valor(registro, self._config.clave_id)
-        self._pagina.show_dialog(
-            DialogoConfirmacion(
+        self._abrir_dialogo(
+            lambda: DialogoConfirmacion(
+                self._pagina,
                 "Confirmar eliminación",
                 self._config.texto_confirmar_borrado,
                 lambda: self._borrar(identificador),
@@ -222,6 +228,31 @@ class PantallaCrud:
         )
 
     # ── Ejecución con manejo de errores ─────────────────────────
+
+    def _abrir_dialogo(self, construir: Callable[[], ft.AlertDialog]) -> None:
+        """
+        Arma un diálogo y lo muestra, avisando si no se pudo abrir.
+
+        Armar un formulario puede fallar: los desplegables de relaciones
+        consultan la base de datos, y un registro con un dato inesperado rompe
+        la construcción. Sin esta protección la excepción sube al despacho de
+        eventos de Flet, que la descarta: el usuario pulsa el botón y no ocurre
+        absolutamente nada, sin diálogo, sin aviso y sin rastro en el registro.
+
+        Args:
+            construir: Función que arma el diálogo a mostrar.
+        """
+        try:
+            dialogo = construir()
+        except ErrorAplicacion as error:
+            avisar_error(self._pagina, str(error))
+            return
+        except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
+            logger.exception("No se pudo armar el diálogo de %s", self._config.titulo)
+            avisar_error(self._pagina, f"No se pudo abrir el formulario: {error}")
+            return
+
+        self._pagina.show_dialog(dialogo)
 
     def _ejecutar(self, operacion: Callable[[], Any], mensaje_exito: str) -> None:
         """

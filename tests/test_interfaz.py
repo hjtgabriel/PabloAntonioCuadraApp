@@ -164,22 +164,24 @@ def test_el_campo_obligatorio_se_marca_con_asterisco():
     assert campo_texto("Nombre").label == "Nombre"
 
 
-def test_los_dialogos_se_construyen():
+def test_los_dialogos_se_construyen(pagina):
     """Los diálogos reutilizables deben armarse sin errores de API."""
     formulario = DialogoFormulario(
+        pagina,
         "Prueba",
         [Campo("nombre", "Nombre", campo_texto("Nombre"), obligatorio=True)],
         lambda _datos: None,
     )
-    confirmacion = DialogoConfirmacion("Título", "¿Seguro?", lambda: None)
+    confirmacion = DialogoConfirmacion(pagina, "Título", "¿Seguro?", lambda: None)
     assert isinstance(formulario, ft.AlertDialog)
     assert isinstance(confirmacion, ft.AlertDialog)
 
 
-def test_el_formulario_exige_los_campos_obligatorios():
+def test_el_formulario_exige_los_campos_obligatorios(pagina):
     """Un obligatorio vacío debe impedir que se entreguen los datos."""
     recibidos: list[dict] = []
     formulario = DialogoFormulario(
+        pagina,
         "Prueba",
         [Campo("nombre", "Nombre", campo_texto("Nombre"), obligatorio=True)],
         recibidos.append,
@@ -188,9 +190,10 @@ def test_el_formulario_exige_los_campos_obligatorios():
     assert recibidos == []
 
 
-def test_el_formulario_entrega_los_datos_completos():
+def test_el_formulario_entrega_los_datos_completos(pagina):
     """Con los obligatorios llenos, el formulario debe devolver los valores."""
     formulario = DialogoFormulario(
+        pagina,
         "Prueba",
         [Campo("nombre", "Nombre", campo_texto("Nombre", valor="Elena"), obligatorio=True)],
         lambda _datos: None,

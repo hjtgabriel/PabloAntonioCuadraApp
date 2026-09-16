@@ -210,6 +210,56 @@ class ServicioUsuarios:
                 )
             )
 
+    def crear_para_empleado(self, datos: dict) -> int:
+        """
+        Da credencial de acceso a un empleado que ya está registrado.
+
+        Es la vía normal desde la pantalla de usuarios: los datos personales ya
+        están en el sistema, así que solo se piden el identificador de acceso,
+        la contraseña y el rol. Evita volver a escribir nombres y apellidos, y
+        con ello el riesgo de crear un empleado duplicado por una diferencia de
+        tecleo.
+
+        Args:
+            datos: Diccionario con «idempleado», «nombreusuario», «contrasena»
+                y «idrol».
+
+        Returns:
+            Clave del usuario creado.
+
+        Raises:
+            ErrorValidacion: Si algún dato obligatorio falta o es inválido.
+            ErrorNoEncontrado: Si el empleado indicado no existe.
+            ErrorDuplicado: Si el identificador de acceso ya está tomado, o si
+                el empleado ya tiene credencial.
+        """
+        idempleado = _validar_empleado(datos.get("idempleado"))
+        nombreusuario = _validar_nombre_usuario(datos.get("nombreusuario"))
+        idrol = _validar_rol(datos.get("idrol"))
+        contrasena = str(datos.get("contrasena") or "")
+        _validar_contrasena(contrasena)
+
+        with transaccion(self._conexion) as conexion:
+            usuarios = UsuarioRepositorio(conexion)
+            empleados = EmpleadoRepositorio(conexion)
+
+            if empleados.buscar_por_id(idempleado) is None:
+                raise ErrorNoEncontrado("No se encontró el empleado seleccionado")
+            if empleados.obtener_idusuario(idempleado) is not None:
+                raise ErrorDuplicado("Ese empleado ya tiene un usuario asignado")
+            if usuarios.existe_nombre_usuario(nombreusuario):
+                raise ErrorDuplicado(f"El usuario «{nombreusuario}» ya existe")
+
+            return usuarios.insertar(
+                Usuario(
+                    idusuario=0,
+                    idempleado=idempleado,
+                    idrol=idrol,
+                    nombreusuario=nombreusuario,
+                    contrasena=cifrar_contrasena(contrasena),
+                )
+            )
+
     def actualizar(self, idusuario: int, datos: dict) -> bool:
         """
         Modifica un usuario y los datos personales de su empleado.
@@ -379,6 +429,27 @@ def _validar_rol(valor: object) -> int:
         return int(valor)
     except (TypeError, ValueError) as error:
         raise ErrorValidacion("El rol seleccionado no es válido") from error
+
+
+def _validar_empleado(valor: object) -> int:
+    """
+    Convierte y valida la clave de empleado recibida de la interfaz.
+
+    Args:
+        valor: Clave del empleado, posiblemente como texto.
+
+    Returns:
+        La clave como entero.
+
+    Raises:
+        ErrorValidacion: Si falta o no es un número.
+    """
+    if valor is None or str(valor).strip() == "":
+        raise ErrorValidacion("Debe seleccionar un empleado")
+    try:
+        return int(valor)
+    except (TypeError, ValueError) as error:
+        raise ErrorValidacion("El empleado seleccionado no es válido") from error
 
 
 def _texto_obligatorio(valor: object, etiqueta: str) -> str:

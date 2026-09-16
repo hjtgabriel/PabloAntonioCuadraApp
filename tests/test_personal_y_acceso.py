@@ -219,3 +219,118 @@ def test_la_busqueda_de_empleados_filtra(base_datos):
 
     encontrados = servicio.listar("rosa")
     assert [fila["nombres"] for fila in encontrados] == ["Rosa"]
+
+
+# ── Alta de usuario sobre un empleado existente ─────────────────────────
+
+
+def test_dar_credencial_a_un_empleado_existente(base_datos):
+    """El alta normal reutiliza los datos personales que ya están guardados."""
+    idempleado = ServicioEmpleados().crear(
+        {"nombres": "Rosa", "apellidos": "Díaz", "telefono": "88112233"}
+    )
+
+    idusuario = ServicioUsuarios().crear_para_empleado(
+        {
+            "idempleado": idempleado,
+            "nombreusuario": "rdiaz",
+            "contrasena": "clave-segura-1",
+            "idrol": 2,
+        }
+    )
+
+    usuario = [u for u in ServicioUsuarios().listar() if u["idusuario"] == idusuario][0]
+    assert usuario["nombreusuario"] == "rdiaz"
+    assert usuario["nombres"] == "Rosa"
+    assert usuario["apellidos"] == "Díaz"
+
+
+def test_no_se_crea_un_empleado_nuevo_al_dar_la_credencial(base_datos):
+    """Dar acceso a un empleado no debe duplicarlo en la tabla de empleados."""
+    idempleado = ServicioEmpleados().crear({"nombres": "Rosa", "apellidos": "Díaz"})
+    antes = len(ServicioEmpleados().listar())
+
+    ServicioUsuarios().crear_para_empleado(
+        {
+            "idempleado": idempleado,
+            "nombreusuario": "rdiaz",
+            "contrasena": "clave-segura-1",
+            "idrol": 2,
+        }
+    )
+
+    assert len(ServicioEmpleados().listar()) == antes
+
+
+def test_un_empleado_no_puede_tener_dos_credenciales(base_datos):
+    """Si el empleado ya tiene usuario, el alta debe rechazarse."""
+    idempleado = ServicioEmpleados().crear({"nombres": "Rosa", "apellidos": "Díaz"})
+    datos = {
+        "idempleado": idempleado,
+        "nombreusuario": "rdiaz",
+        "contrasena": "clave-segura-1",
+        "idrol": 2,
+    }
+    ServicioUsuarios().crear_para_empleado(datos)
+
+    with pytest.raises(ErrorDuplicado):
+        ServicioUsuarios().crear_para_empleado({**datos, "nombreusuario": "rdiaz2"})
+
+
+def test_no_se_puede_dar_credencial_a_un_empleado_inexistente(base_datos):
+    """Una clave de empleado que no existe debe rechazarse."""
+    with pytest.raises(ErrorNoEncontrado):
+        ServicioUsuarios().crear_para_empleado(
+            {
+                "idempleado": 9999,
+                "nombreusuario": "fantasma",
+                "contrasena": "clave-segura-1",
+                "idrol": 2,
+            }
+        )
+
+
+def test_hay_que_elegir_un_empleado(base_datos):
+    """Dejar el empleado sin elegir debe dar un error claro."""
+    with pytest.raises(ErrorValidacion, match="empleado"):
+        ServicioUsuarios().crear_para_empleado(
+            {
+                "idempleado": "",
+                "nombreusuario": "alguien",
+                "contrasena": "clave-segura-1",
+                "idrol": 2,
+            }
+        )
+
+
+def test_el_empleado_con_credencial_sale_de_la_lista_de_disponibles(base_datos):
+    """Quien ya tiene usuario no debe ofrecerse para recibir otro."""
+    idempleado = ServicioEmpleados().crear({"nombres": "Rosa", "apellidos": "Díaz"})
+    assert idempleado in [e.idempleado for e in ServicioEmpleados().listar_sin_usuario()]
+
+    ServicioUsuarios().crear_para_empleado(
+        {
+            "idempleado": idempleado,
+            "nombreusuario": "rdiaz",
+            "contrasena": "clave-segura-1",
+            "idrol": 2,
+        }
+    )
+
+    assert idempleado not in [e.idempleado for e in ServicioEmpleados().listar_sin_usuario()]
+
+
+def test_la_credencial_creada_sirve_para_entrar(base_datos):
+    """El usuario recién creado debe poder iniciar sesión (RF01)."""
+    idempleado = ServicioEmpleados().crear({"nombres": "Rosa", "apellidos": "Díaz"})
+    ServicioUsuarios().crear_para_empleado(
+        {
+            "idempleado": idempleado,
+            "nombreusuario": "rdiaz",
+            "contrasena": "clave-segura-1",
+            "idrol": 2,
+        }
+    )
+
+    sesion = ServicioAutenticacion().iniciar_sesion("rdiaz", "clave-segura-1")
+    assert sesion.nombre_completo == "Rosa Díaz"

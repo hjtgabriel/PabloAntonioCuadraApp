@@ -15,9 +15,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from modulos.personal.servicios import ServicioUsuarios
+import pytest
+
+from modulos.personal.servicios import ServicioEmpleados, ServicioUsuarios
 from modulos.productos.servicios import ServicioProductos
 from modulos.proveedores.servicios import ServicioProveedores
+from nucleo.errores import ErrorValidacion
 from vistas.componentes.campos import campo_seleccion
 from vistas.componentes.dialogos import Campo, definir_campo
 from vistas.componentes.registros import lector, lector_de_texto, leer_valor
@@ -272,6 +275,7 @@ def test_formulario_de_usuario_pide_contrasena_solo_al_dar_de_alta(usuario_admin
     """Al editar, dejar la contraseña en blanco conserva la actual."""
     from vistas import personal
 
+    ServicioEmpleados().crear({"nombres": "Libre", "apellidos": "Sinusuario"})
     construir = constructor_de_campos(personal, personal.pantalla_usuarios)
 
     alta = construir(None)
@@ -283,6 +287,90 @@ def test_formulario_de_usuario_pide_contrasena_solo_al_dar_de_alta(usuario_admin
     assert buscar(edicion, "contrasena").obligatorio is False
     assert buscar(edicion, "nombreusuario").control.value == "admin"
     assert buscar(edicion, "idrol").control.value == "1"
+
+
+def test_el_alta_de_usuario_no_vuelve_a_pedir_los_datos_personales(usuario_admin):
+    """
+    Los datos del empleado ya están en el sistema: no se escriben otra vez.
+
+    El alta solo elige a quién se le da acceso y con qué credencial.
+    """
+    from vistas import personal
+
+    ServicioEmpleados().crear({"nombres": "Libre", "apellidos": "Sinusuario"})
+    construir = constructor_de_campos(personal, personal.pantalla_usuarios)
+
+    assert claves(construir(None)) == ["idempleado", "nombreusuario", "contrasena", "idrol"]
+
+
+def test_el_alta_de_usuario_solo_ofrece_empleados_sin_credencial(base_datos):
+    """Quien ya tiene usuario no debe aparecer en el desplegable."""
+    from vistas import personal
+
+    con_acceso = ServicioEmpleados().crear({"nombres": "Ya", "apellidos": "Tiene"})
+    sin_acceso = ServicioEmpleados().crear({"nombres": "Aún", "apellidos": "No"})
+    ServicioUsuarios().crear_para_empleado(
+        {
+            "idempleado": con_acceso,
+            "nombreusuario": "yatiene",
+            "contrasena": "clave-segura-1",
+            "idrol": 2,
+        }
+    )
+
+    construir = constructor_de_campos(personal, personal.pantalla_usuarios)
+    opciones = buscar(construir(None), "idempleado").control.options
+
+    claves_ofrecidas = [int(opcion.key) for opcion in opciones]
+    assert sin_acceso in claves_ofrecidas
+    assert con_acceso not in claves_ofrecidas
+
+
+def test_si_no_hay_empleados_libres_se_explica_que_hacer(usuario_admin):
+    """
+    Un desplegable vacío no dice nada; el aviso sí.
+
+    Con el único empleado ya acreditado, abrir el alta debe explicar que hay
+    que registrar antes a la persona, en vez de mostrar una lista vacía.
+    """
+    from vistas import personal
+
+    construir = constructor_de_campos(personal, personal.pantalla_usuarios)
+
+    with pytest.raises(ErrorValidacion, match="Empleados"):
+        construir(None)
+
+
+def test_el_desplegable_muestra_el_nombre_completo_del_empleado(base_datos):
+    """El administrador elige por nombre, no por número."""
+    from vistas import personal
+
+    ServicioEmpleados().crear({"nombres": "Rosa", "apellidos": "Díaz"})
+
+    construir = constructor_de_campos(personal, personal.pantalla_usuarios)
+    textos = [o.text for o in buscar(construir(None), "idempleado").control.options]
+
+    assert "Rosa Díaz" in textos
+
+
+def test_al_editar_un_usuario_si_se_ven_sus_datos_personales(usuario_admin):
+    """La edición sigue permitiendo corregir los datos del empleado."""
+    from vistas import personal
+
+    construir = constructor_de_campos(personal, personal.pantalla_usuarios)
+    edicion = construir(ServicioUsuarios().listar()[0])
+
+    assert claves(edicion) == [
+        "nombres",
+        "apellidos",
+        "direccion",
+        "telefono",
+        "nombreusuario",
+        "contrasena",
+        "idrol",
+    ]
+    assert buscar(edicion, "nombres").control.value == "Ana"
+    assert "idempleado" not in claves(edicion)
 
 
 def test_formulario_de_proveedor_viene_precargado(base_datos):

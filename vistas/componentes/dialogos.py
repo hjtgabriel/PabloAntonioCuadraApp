@@ -9,6 +9,14 @@ lanzaba ``AttributeError`` en cada alta y cada edición.
 Cada apertura construye un diálogo nuevo. Además de ser más simple de razonar,
 evita el ``RuntimeError`` que Flet lanza si se intenta mostrar un diálogo que
 ya está abierto.
+
+Todo diálogo recibe la página en el constructor y **no** la deduce de
+``self.page``. En Flet 0.86.5 ``Control.page`` recorre la cadena de padres
+hasta encontrar la página y lanza ``RuntimeError`` si no la alcanza; un diálogo
+mostrado con ``show_dialog`` cuelga de ``page._dialogs``, que puede no estar
+montado todavía cuando el usuario pulsa un botón. Por eso ``self.page`` fallaba
+al confirmar, y con él se caían el guardar de toda alta y edición y el eliminar
+de todo módulo: el diálogo se abría, pero el botón no hacía nada.
 """
 
 from __future__ import annotations
@@ -86,7 +94,37 @@ def definir_campo(
     return Campo(clave, etiqueta, control, obligatorio=obligatorio)
 
 
-class DialogoFormulario(ft.AlertDialog):
+class DialogoBase(ft.AlertDialog):
+    """
+    Base de los diálogos de la aplicación: guarda la página y sabe cerrarse.
+
+    Concentra el cierre en un solo sitio para que ningún diálogo vuelva a
+    depender de ``self.page``.
+    """
+
+    def _recordar_pagina(self, pagina: ft.Page) -> None:
+        """
+        Guarda la página con la que el diálogo se abrirá y se cerrará.
+
+        Se llama antes de ``super().__init__()`` porque los manejadores de los
+        botones se construyen dentro de esa llamada.
+
+        Args:
+            pagina: Página sobre la que se muestra el diálogo.
+        """
+        self._pagina = pagina
+
+    def cerrar(self, _evento: ft.ControlEvent | None = None) -> None:
+        """
+        Cierra el diálogo.
+
+        Args:
+            _evento: Evento del botón, que no se usa.
+        """
+        self._pagina.pop_dialog()
+
+
+class DialogoFormulario(DialogoBase):
     """
     Diálogo de alta o edición construido a partir de una lista de campos.
 
@@ -96,6 +134,7 @@ class DialogoFormulario(ft.AlertDialog):
 
     def __init__(
         self,
+        pagina: ft.Page,
         titulo: str,
         campos: list[Campo],
         al_guardar: Callable[[dict], None],
@@ -104,11 +143,13 @@ class DialogoFormulario(ft.AlertDialog):
     ) -> None:
         """
         Args:
+            pagina: Página sobre la que se muestra el diálogo.
             titulo: Encabezado del diálogo.
             campos: Campos del formulario, en orden de aparición.
             al_guardar: Función que recibe los valores ya validados.
             texto_guardar: Rótulo del botón de confirmación.
         """
+        self._recordar_pagina(pagina)
         self._campos = campos
         self._al_guardar = al_guardar
         self._error = ft.Text("", size=12, color=ERROR, visible=False)
@@ -141,7 +182,7 @@ class DialogoFormulario(ft.AlertDialog):
                 ft.TextButton(
                     "Cancelar",
                     icon=ft.Icons.CLOSE,
-                    on_click=self._al_cancelar,
+                    on_click=self.cerrar,
                     style=ft.ButtonStyle(color=TEXTO),
                 ),
                 ft.Button(
@@ -162,12 +203,8 @@ class DialogoFormulario(ft.AlertDialog):
         if datos is None:
             return
 
-        self.page.pop_dialog()
+        self.cerrar()
         self._al_guardar(datos)
-
-    def _al_cancelar(self, _evento: ft.ControlEvent) -> None:
-        """Cierra el diálogo sin guardar nada."""
-        self.page.pop_dialog()
 
     def _recoger_valores(self) -> dict | None:
         """
@@ -205,11 +242,12 @@ class DialogoFormulario(ft.AlertDialog):
             refrescar(self)
 
 
-class DialogoConfirmacion(ft.AlertDialog):
+class DialogoConfirmacion(DialogoBase):
     """Diálogo de sí o no, usado para confirmar borrados y otras acciones."""
 
     def __init__(
         self,
+        pagina: ft.Page,
         titulo: str,
         mensaje: str,
         al_confirmar: Callable[[], None],
@@ -219,12 +257,14 @@ class DialogoConfirmacion(ft.AlertDialog):
     ) -> None:
         """
         Args:
+            pagina: Página sobre la que se muestra el diálogo.
             titulo: Encabezado del diálogo.
             mensaje: Pregunta que se le hace al usuario.
             al_confirmar: Función a ejecutar si acepta.
             texto_confirmar: Rótulo del botón de aceptación.
             destructiva: Si la acción borra datos; cambia el color y el icono.
         """
+        self._recordar_pagina(pagina)
         self._al_confirmar = al_confirmar
 
         super().__init__(
@@ -235,7 +275,7 @@ class DialogoConfirmacion(ft.AlertDialog):
                 ft.TextButton(
                     "Cancelar",
                     icon=ft.Icons.CLOSE,
-                    on_click=lambda _evento: self.page.pop_dialog(),
+                    on_click=self.cerrar,
                     style=ft.ButtonStyle(color=TEXTO),
                 ),
                 ft.Button(
@@ -252,19 +292,21 @@ class DialogoConfirmacion(ft.AlertDialog):
 
     def _confirmar(self, _evento: ft.ControlEvent) -> None:
         """Cierra el diálogo y ejecuta la acción confirmada."""
-        self.page.pop_dialog()
+        self.cerrar()
         self._al_confirmar()
 
 
-class DialogoInformacion(ft.AlertDialog):
+class DialogoInformacion(DialogoBase):
     """Diálogo de solo lectura, para mostrar un comprobante o un detalle."""
 
-    def __init__(self, titulo: str, contenido: ft.Control) -> None:
+    def __init__(self, pagina: ft.Page, titulo: str, contenido: ft.Control) -> None:
         """
         Args:
+            pagina: Página sobre la que se muestra el diálogo.
             titulo: Encabezado del diálogo.
             contenido: Control con la información a mostrar.
         """
+        self._recordar_pagina(pagina)
         super().__init__(
             modal=True,
             title=ft.Text(titulo, color=TEXTO, weight=ft.FontWeight.BOLD),
@@ -273,7 +315,7 @@ class DialogoInformacion(ft.AlertDialog):
                 ft.Button(
                     "Aceptar",
                     icon=ft.Icons.CHECK,
-                    on_click=lambda _evento: self.page.pop_dialog(),
+                    on_click=self.cerrar,
                     bgcolor=ACENTO,
                     color=SUPERFICIE,
                     style=estilo_boton(),

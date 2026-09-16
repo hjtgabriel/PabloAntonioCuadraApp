@@ -364,7 +364,7 @@ class PuntoDeVenta:
             return
 
         avisar_exito(self._pagina, f"Venta {comprobante.idventa} registrada")
-        self._pagina.show_dialog(_comprobante(comprobante))
+        self._pagina.show_dialog(_comprobante(self._pagina, comprobante))
         self._vaciar()
 
     def _vaciar(self) -> None:
@@ -427,11 +427,12 @@ def pantalla_ventas(pagina: ft.Page, idusuario: int) -> ft.Control:
     return PuntoDeVenta(pagina, idusuario).construir()
 
 
-def _comprobante(venta: ComprobanteVenta) -> ft.AlertDialog:
+def _comprobante(pagina: ft.Page, venta: ComprobanteVenta) -> ft.AlertDialog:
     """
     Arma el diálogo con el comprobante de la venta.
 
     Args:
+        pagina: Página sobre la que se muestra el comprobante.
         venta: Datos de la venta recién registrada.
 
     Returns:
@@ -462,4 +463,4 @@ def _comprobante(venta: ComprobanteVenta) -> ft.AlertDialog:
         spacing=ESPACIO,
         width=320,
     )
-    return DialogoInformacion("Venta registrada", contenido)
+    return DialogoInformacion(pagina, "Venta registrada", contenido)

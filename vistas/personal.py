@@ -12,6 +12,7 @@ import flet as ft
 
 from modulos.catalogos.servicios import servicio_roles
 from modulos.personal.servicios import ServicioEmpleados, ServicioUsuarios
+from nucleo.errores import ErrorValidacion
 from vistas.componentes.campos import (
     campo_contrasena,
     campo_seleccion,
@@ -66,9 +67,15 @@ def _campos_usuario(registro: object | None) -> list[Campo]:
     """
     Arma el formulario de usuario, precargado si se está editando.
 
-    A los datos personales les añade la credencial. Al editar, la contraseña
-    deja de ser obligatoria: en blanco significa conservar la actual, de modo
-    que nunca hace falta mostrar ni volver a escribir la que ya existe.
+    Al dar de alta no se piden los datos personales: se elige un empleado ya
+    registrado y solo se completa su credencial. Volver a escribir nombres y
+    apellidos que el sistema ya tiene sobra, y además abre la puerta a crear un
+    empleado duplicado por una diferencia de tecleo.
+
+    Al editar sí aparecen los datos personales, porque desde aquí se corrigen
+    los del empleado, y la contraseña deja de ser obligatoria: en blanco
+    significa conservar la actual, de modo que nunca hace falta mostrar ni
+    volver a escribir la que ya existe.
 
     Args:
         registro: Usuario a editar, o None si es un alta.
@@ -76,10 +83,52 @@ def _campos_usuario(registro: object | None) -> list[Campo]:
     Returns:
         Los campos del formulario, en orden de aparición.
     """
+    if registro is None:
+        return [_campo_empleado(), *_campos_credencial(None)]
+    return [*_campos_persona(registro), *_campos_credencial(registro)]
+
+
+def _campo_empleado() -> Campo:
+    """
+    Arma el desplegable de empleados que todavía no tienen credencial.
+
+    Returns:
+        El campo de selección de empleado.
+
+    Raises:
+        ErrorValidacion: Si no queda ningún empleado al que dar acceso. Sin
+            esto el administrador vería un desplegable vacío y sin explicación,
+            y al guardar solo obtendría un «es obligatorio» que no dice qué
+            hacer.
+    """
+    opciones = _opciones_empleado()
+    if not opciones:
+        raise ErrorValidacion(
+            "No hay empleados sin usuario. Registre primero a la persona en "
+            "«Empleados» y vuelva a intentarlo."
+        )
+    return definir_campo(
+        "idempleado",
+        "Empleado",
+        campo_seleccion,
+        obligatorio=True,
+        opciones=opciones,
+    )
+
+
+def _campos_credencial(registro: object | None) -> list[Campo]:
+    """
+    Arma los campos de acceso: identificador, contraseña y rol.
+
+    Args:
+        registro: Usuario a editar, o None si es un alta.
+
+    Returns:
+        Los campos de la credencial, en orden de aparición.
+    """
     editando = registro is not None
     valor = lector(registro)
     return [
-        *_campos_persona(registro),
         definir_campo(
             "nombreusuario",
             "Nombre de usuario",
@@ -173,7 +222,7 @@ def pantalla_usuarios(pagina: ft.Page) -> ft.Control:
             ],
             construir_campos=_campos_usuario,
             listar=servicio.listar,
-            crear=servicio.crear_con_empleado,
+            crear=servicio.crear_para_empleado,
             actualizar=servicio.actualizar,
             eliminar=servicio.eliminar,
             marcador_busqueda="Buscar usuario…",
@@ -183,6 +232,22 @@ def pantalla_usuarios(pagina: ft.Page) -> ft.Control:
             ),
         ),
     )
+
+
+def _opciones_empleado() -> list[tuple[object, str]]:
+    """
+    Trae los empleados que aún pueden recibir una credencial.
+
+    Solo aparecen los que no tienen usuario: dar dos credenciales al mismo
+    empleado no tiene sentido, y el servicio lo rechazaría igualmente.
+
+    Returns:
+        Pares (clave del empleado, nombre completo).
+    """
+    return [
+        (empleado.idempleado, f"{empleado.nombres} {empleado.apellidos}".strip())
+        for empleado in ServicioEmpleados().listar_sin_usuario()
+    ]
 
 
 def _opciones_rol() -> list[tuple[object, str]]:

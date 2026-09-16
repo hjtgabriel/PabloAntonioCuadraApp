@@ -146,10 +146,21 @@ Solo para administración. Hay tres:
 
 Solo para administración.
 
-Al crear un usuario se crea también su empleado, en una sola operación.
+El alta va en dos pasos, y en este orden:
 
-Al **editar** un usuario, deje el campo de contraseña **en blanco** si no quiere
-cambiarla. Solo se reemplaza si escribe una nueva.
+1. En **Empleados**, registre a la persona con sus nombres, apellidos, teléfono
+   y dirección.
+2. En **Usuarios**, pulse el botón de agregar y **elija a ese empleado** en la
+   lista. Solo tendrá que escribir el nombre de usuario, la contraseña y el rol:
+   los datos personales ya están en el sistema y no se repiten.
+
+La lista solo ofrece empleados que todavía no tienen credencial, así que nadie
+puede terminar con dos usuarios. Si el empleado que busca no aparece, o ya tiene
+acceso, o falta registrarlo en **Empleados**.
+
+Al **editar** un usuario sí aparecen sus datos personales, porque desde ahí se
+corrigen los del empleado. Deje el campo de contraseña **en blanco** si no
+quiere cambiarla: solo se reemplaza si escribe una nueva.
 
 No se puede eliminar un usuario que ya registró ventas: el historial debe
 conservar quién las hizo.
