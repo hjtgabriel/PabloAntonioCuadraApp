@@ -24,6 +24,10 @@ respaldos/
 logs/
 *.log
 
+# Lanzador de la tarea programada: lo genera el instalador con las rutas
+# absolutas de cada equipo, así que no debe compartirse.
+herramientas/ejecutar_respaldo.bat
+
 # Editores y sistema operativo
 .vscode/
 .idea/

@@ -33,6 +33,26 @@ HORA_EJECUCION = "00:00"
 EXITO = 0
 ERROR = 1
 
+LANZADOR = RAIZ_PROYECTO / "herramientas" / "ejecutar_respaldo.bat"
+
+PLANTILLA_LANZADOR = """@echo off
+REM ---------------------------------------------------------------------
+REM  Lanzador del respaldo automatico de la libreria Pablo Antonio Cuadra.
+REM
+REM  Lo genera «python -m herramientas.instalar_tarea» con las rutas de
+REM  este equipo. NO lo edite a mano: se reescribe en cada instalacion, y
+REM  por eso esta excluido del repositorio.
+REM
+REM  Existe porque el Programador de tareas invoca la accion a traves de
+REM  cmd.exe, y una linea con comillas anidadas —la ruta de Python dentro
+REM  de un «cd ... && ...»— hace que cmd descarte el comando y termine
+REM  con exito sin ejecutar nada. Un archivo .bat evita ese problema.
+REM ---------------------------------------------------------------------
+cd /d "{proyecto}"
+"{python}" -m herramientas.respaldo_programado %*
+exit /b %ERRORLEVEL%
+"""
+
 
 def principal(argumentos: list[str] | None = None) -> int:
     """
@@ -60,22 +80,34 @@ def principal(argumentos: list[str] | None = None) -> int:
     return _instalar()
 
 
+def _escribir_lanzador() -> None:
+    """
+    Genera el archivo .bat que ejecutará la tarea programada.
+
+    Se escribe con las rutas absolutas de este equipo, de modo que el
+    Programador de tareas solo tenga que invocar un único archivo sin
+    argumentos complicados.
+    """
+    LANZADOR.write_text(
+        PLANTILLA_LANZADOR.format(proyecto=RAIZ_PROYECTO, python=sys.executable),
+        encoding="utf-8",
+    )
+    print(f"Lanzador generado: {LANZADOR}")
+
+
 def _instalar() -> int:
     """
     Registra la tarea diaria en el Programador de tareas.
 
     Returns:
-        0 si se registró, 1 si falló.
+        0 si se registró y la comprobación posterior salió bien, 1 si falló.
     """
-    comando = (
-        f'"{sys.executable}" -m herramientas.respaldo_programado'
-    )
-    envoltorio = f'cmd /c "cd /d {RAIZ_PROYECTO} && {comando}"'
+    _escribir_lanzador()
 
     argumentos = [
         "schtasks", "/Create",
         "/TN", NOMBRE_TAREA,
-        "/TR", envoltorio,
+        "/TR", str(LANZADOR),
         "/SC", "DAILY",
         "/ST", HORA_EJECUCION,
         "/RL", "HIGHEST",
@@ -92,9 +124,40 @@ def _instalar() -> int:
         return ERROR
 
     print("[LISTO] Tarea registrada.\n")
+
+    if not _comprobar_lanzador():
+        return ERROR
+
     _explicar_rotacion()
     _recordar_ajuste_manual()
     return EXITO
+
+
+def _comprobar_lanzador() -> bool:
+    """
+    Ejecuta el lanzador para confirmar que de verdad genera un respaldo.
+
+    Registrar la tarea no basta: el Programador puede dar por buena una acción
+    que no llega a ejecutar nada. Esta comprobación corre el lanzador y exige
+    que termine correctamente.
+
+    Returns:
+        True si el lanzador funcionó.
+    """
+    print("Comprobando que el lanzador funcione de verdad…")
+    resultado = subprocess.run(
+        [str(LANZADOR), "--tipo", "diario", "--sin-correo"],
+        capture_output=True, text=True, check=False,
+    )
+
+    if resultado.returncode != 0:
+        print("\n[ERROR] El lanzador no pudo generar el respaldo.")
+        print("  " + (resultado.stderr or resultado.stdout).strip()[-400:])
+        print("\nLa tarea quedó registrada, pero NO funcionaría. Revise el error.")
+        return False
+
+    print("[LISTO] El lanzador genera respaldos correctamente.\n")
+    return True
 
 
 def _desinstalar() -> int:
@@ -113,6 +176,7 @@ def _desinstalar() -> int:
         print("  " + (resultado.stderr or resultado.stdout).strip())
         return ERROR
 
+    LANZADOR.unlink(missing_ok=True)
     print(f"[LISTO] Tarea «{NOMBRE_TAREA}» eliminada.")
     return EXITO
 
