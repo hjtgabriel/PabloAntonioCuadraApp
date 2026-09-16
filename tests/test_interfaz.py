@@ -20,6 +20,7 @@ from modulos.ventas.servicios import ServicioVentas
 from vistas.catalogos import pantalla_categorias, pantalla_marcas, pantalla_roles
 from vistas.componentes.campos import campo_decimal, campo_entero, campo_seleccion, campo_texto
 from vistas.componentes.dialogos import Campo, DialogoConfirmacion, DialogoFormulario
+from vistas.componentes.layout import pantalla_con_boton
 from vistas.componentes.tablas import Columna, TablaDatos
 from vistas.historiales import pantalla_historial_inventario, pantalla_historial_precios
 from vistas.inventario import pantalla_inventario
@@ -257,3 +258,39 @@ def test_ningun_color_esta_escrito_a_mano_en_las_vistas():
         if encontrados:
             culpables.append(f"{ruta.relative_to(raiz).as_posix()}: {encontrados}")
     assert culpables == [], f"Colores escritos a mano en: {culpables}"
+
+
+# ── El botón flotante no debe tapar la pantalla ─────────────────────────
+
+
+def test_el_boton_flotante_va_posicionado_y_no_cubre_la_pantalla():
+    """
+    El botón de alta se superpone sin robarle las pulsaciones a la pantalla.
+
+    Un hijo de ``Stack`` sin posicionar se estira hasta ocupar todo el espacio.
+    Si el botón viviera en un contenedor así, su área transparente quedaría por
+    encima de la tabla y de la barra de búsqueda, que se verían pero no
+    responderían. Es el fallo que dejaba editar, eliminar y buscar sin efecto
+    en todas las pantallas de mantenimiento.
+    """
+    cuerpo = ft.Text("contenido")
+    raiz = pantalla_con_boton("Título", cuerpo, "Agregar", lambda _e: None)
+
+    assert isinstance(raiz, ft.Stack)
+    capa_boton = raiz.controls[-1]
+
+    assert capa_boton.right is not None, "El botón debe ir posicionado con «right»"
+    assert capa_boton.bottom is not None, "El botón debe ir posicionado con «bottom»"
+    assert capa_boton.alignment is None, (
+        "Con «alignment» el contenedor se estira y tapa toda la pantalla"
+    )
+    assert not capa_boton.expand, "La capa del botón nunca debe expandirse"
+
+
+def test_la_pantalla_de_mantenimiento_deja_su_cuerpo_bajo_el_boton():
+    """El contenido sigue estando en la capa de abajo, ocupando la pantalla."""
+    cuerpo = ft.Text("contenido")
+    raiz = pantalla_con_boton("Título", cuerpo, "Agregar", lambda _e: None)
+
+    capa_contenido = raiz.controls[0]
+    assert capa_contenido.expand is True

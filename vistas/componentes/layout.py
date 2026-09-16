@@ -91,6 +91,15 @@ def pantalla_con_boton(
         al_pulsar: Acción del botón flotante.
         *acciones: Controles del encabezado.
 
+    El botón se coloca con ``right`` y ``bottom``, es decir, como hijo
+    posicionado del ``Stack``. La alternativa evidente —un contenedor con
+    ``alignment`` en la esquina— parece equivalente y no lo es: un hijo sin
+    posicionar se estira hasta ocupar todo el ``Stack``, de modo que su área
+    transparente queda por encima de la pantalla entera y se traga las
+    pulsaciones. Con eso, la tabla y la barra de búsqueda se veían pero no
+    respondían, y el único control que seguía funcionando era el propio botón,
+    porque era el que estaba arriba.
+
     Returns:
         La pantalla con el botón superpuesto.
     """
@@ -105,8 +114,8 @@ def pantalla_con_boton(
                     tooltip=texto_boton,
                     on_click=al_pulsar,
                 ),
-                alignment=ft.Alignment(1.0, 1.0),
-                padding=ESPACIO_GRANDE,
+                right=ESPACIO_GRANDE,
+                bottom=ESPACIO_GRANDE,
             ),
         ],
         expand=True,
