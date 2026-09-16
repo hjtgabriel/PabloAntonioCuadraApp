@@ -247,6 +247,16 @@ def constructor_de_campos(modulo, pantalla):
     original = modulo.construir_pantalla_crud
 
     def espia(pag, config):
+        """
+        Se queda con el constructor de campos y deja seguir la construcción.
+
+        Args:
+            pag: Página que la vista pasa a su CRUD.
+            config: Configuración del CRUD que la vista acaba de armar.
+
+        Returns:
+            La pantalla que habría devuelto la función original.
+        """
         capturado["campos"] = config.construir_campos
         return original(pag, config)
 
@@ -309,6 +319,7 @@ class PaginaMinima:
     """Página falsa suficiente para construir una pantalla en las pruebas."""
 
     def __init__(self) -> None:
+        """Arranca con las listas que las pantallas esperan en la página."""
         self.controls: list = []
         self.dialogos_mostrados: list = []
 

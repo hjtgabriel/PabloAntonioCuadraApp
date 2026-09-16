@@ -40,6 +40,7 @@ class PaginaFalsa:
     """
 
     def __init__(self) -> None:
+        """Arranca sin controles, sin diálogos y sin refrescos contados."""
         self.controls: list = []
         self.dialogos_mostrados: list = []
         self.actualizaciones = 0

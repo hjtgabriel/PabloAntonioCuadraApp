@@ -216,6 +216,10 @@ class Motor(ABC):
     """Fuente de conexiones a la base de datos."""
 
     def __init__(self, dialecto: DialectoSQL) -> None:
+        """
+        Args:
+            dialecto: Traductor de las diferencias de SQL de este motor.
+        """
         self._dialecto = dialecto
 
     @property
@@ -247,6 +251,15 @@ class MotorPostgreSQL(Motor):
     """
 
     def __init__(self) -> None:
+        """
+        Abre la reserva de conexiones con los datos del archivo ``.env``.
+
+        El driver se importa aquí y no al principio del archivo para que la
+        aplicación pueda correr sobre SQLite sin tener psycopg2 instalado.
+
+        Raises:
+            ErrorConexion: Si no se puede contactar con PostgreSQL.
+        """
         super().__init__(DialectoPostgreSQL())
         from psycopg2.pool import ThreadedConnectionPool
 
@@ -319,6 +332,11 @@ class MotorSQLite(Motor):
     """
 
     def __init__(self, ruta: str = ":memory:") -> None:
+        """
+        Args:
+            ruta: Archivo de la base, o ``:memory:`` para no dejar rastro en
+                disco, que es como corren las pruebas.
+        """
         super().__init__(DialectoSQLite())
         self._ruta = ruta
         self._local = threading.local()

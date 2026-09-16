@@ -243,6 +243,18 @@ def longitud_minima(minimo: int, etiqueta: str) -> Validador:
     """
 
     def validar(valor: str) -> str | None:
+        """
+        Comprueba que el texto llegue a la longitud exigida.
+
+        Un campo vacío se da por bueno: de exigirlo se encarga ``obligatorio``,
+        no este validador.
+
+        Args:
+            valor: Texto escrito en el campo.
+
+        Returns:
+            El mensaje de error, o None si el texto es aceptable.
+        """
         if valor and len(valor.strip()) < minimo:
             return f"{etiqueta} debe tener al menos {minimo} caracteres"
         return None
@@ -263,6 +275,15 @@ def _validador_decimal(obligatorio: bool, minimo: Decimal) -> Validador:
     """
 
     def validar(valor: str) -> str | None:
+        """
+        Comprueba que el texto sea un importe válido y no baje del mínimo.
+
+        Args:
+            valor: Texto escrito en el campo.
+
+        Returns:
+            El mensaje de error, o None si el importe es aceptable.
+        """
         texto = (valor or "").strip()
         if not texto:
             return "Este campo es obligatorio" if obligatorio else None
@@ -290,6 +311,15 @@ def _validador_entero(obligatorio: bool, minimo: int) -> Validador:
     """
 
     def validar(valor: str) -> str | None:
+        """
+        Comprueba que el texto sea un entero y no baje del mínimo.
+
+        Args:
+            valor: Texto escrito en el campo.
+
+        Returns:
+            El mensaje de error, o None si la cantidad es aceptable.
+        """
         texto = (valor or "").strip()
         if not texto:
             return "Este campo es obligatorio" if obligatorio else None
@@ -314,6 +344,15 @@ def _validador_fecha(obligatorio: bool) -> Validador:
     """
 
     def validar(valor: str) -> str | None:
+        """
+        Comprueba que el texto tenga el formato AAAA-MM-DD.
+
+        Args:
+            valor: Texto escrito en el campo.
+
+        Returns:
+            El mensaje de error, o None si la fecha está bien escrita.
+        """
         texto = (valor or "").strip()
         if not texto:
             return "Este campo es obligatorio" if obligatorio else None
@@ -351,6 +390,12 @@ def _conectar_validador(campo: ft.TextField, validador: Validador) -> None:
     """
 
     def al_escribir(evento: ft.ControlEvent) -> None:
+        """
+        Valida el campo en cada pulsación y muestra el error en el propio control.
+
+        Args:
+            evento: Evento de cambio que entrega Flet.
+        """
         control = evento.control
         control.error = validador(control.value or "")
         control.update()

@@ -45,6 +45,16 @@ def lector(registro: Any | None) -> Callable[..., Any]:
     """
 
     def leer(clave: str, por_omision: Any = "") -> Any:
+        """
+        Da el valor con el que precargar un campo.
+
+        Args:
+            clave: Nombre del campo a leer.
+            por_omision: Valor a usar en un alta, o si lo guardado es nulo.
+
+        Returns:
+            El valor guardado, o ``por_omision``.
+        """
         if registro is None:
             return por_omision
         valor = leer_valor(registro, clave, por_omision)
@@ -69,6 +79,15 @@ def lector_de_texto(registro: Any | None) -> Callable[[str], str]:
     leer = lector(registro)
 
     def leer_texto(clave: str) -> str:
+        """
+        Da el valor de un campo convertido a texto.
+
+        Args:
+            clave: Nombre del campo a leer.
+
+        Returns:
+            El valor guardado como cadena, o vacío si no hay nada.
+        """
         return str(leer(clave, ""))
 
     return leer_texto

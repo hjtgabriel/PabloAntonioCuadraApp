@@ -37,7 +37,6 @@ def _campos_persona(registro: object | None) -> list[Campo]:
     Returns:
         Campos de nombres, apellidos, dirección y teléfono.
     """
-
     valor = lector_de_texto(registro)
     return [
         definir_campo(

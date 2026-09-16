@@ -348,8 +348,17 @@ python -m pytest --cov=. --cov-report=term-missing   # cobertura
 ```
 
 El linter se configura en `pyproject.toml` (reglas `E`, `F`, `W`, `I`, `UP`,
-`B`, `SIM`, línea de 100). `python -m ruff check . --fix` corrige solo lo que
-puede arreglar sin cambiar el comportamiento.
+`B`, `SIM`, `D`, línea de 100). `python -m ruff check . --fix` corrige solo lo
+que puede arreglar sin cambiar el comportamiento.
+
+Las reglas `D` exigen docstring en todo módulo, clase y función, con la
+convención de Google (`Args:`, `Returns:`, `Raises:`). Así la documentación
+interna no se degrada sin que nadie lo note. Hay tres excepciones declaradas:
+
+- El largo de línea lo fija `line-length`, no la regla `E501`.
+- El resumen de un docstring va en la línea siguiente a las comillas (`D212`).
+- El `__init__` puede empezar directamente por `Args:`, porque el resumen ya
+  está en el docstring de la clase (`D205`).
 
 ### Cómo se declaran los formularios
 

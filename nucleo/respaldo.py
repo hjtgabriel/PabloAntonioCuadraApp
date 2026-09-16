@@ -172,6 +172,7 @@ class ServicioRespaldo:
     """Genera, verifica, distribuye y rota los respaldos de la base de datos."""
 
     def __init__(self) -> None:
+        """Toma del archivo ``.env`` las rutas y los plazos de conservación."""
         self._configuracion = obtener_configuracion()
 
     # ── Operación principal ─────────────────────────────────────

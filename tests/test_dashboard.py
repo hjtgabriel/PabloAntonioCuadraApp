@@ -25,6 +25,7 @@ class PaginaFalsa:
     """Sustituto de ``ft.Page`` para construir el panel fuera de una ventana."""
 
     def __init__(self) -> None:
+        """Arranca con las listas que el panel espera encontrar en la página."""
         self.controls: list = []
         self.dialogos_mostrados: list = []
         self.avisos: list = []
@@ -143,6 +144,10 @@ class ProductoFalso:
     """Producto mínimo, solo con lo que necesita el texto del aviso."""
 
     def __init__(self, descripcion: str) -> None:
+        """
+        Args:
+            descripcion: Nombre del producto tal como saldría en el aviso.
+        """
         self.descripcion = descripcion
 
 

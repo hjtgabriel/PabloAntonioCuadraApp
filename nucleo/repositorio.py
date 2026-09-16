@@ -279,12 +279,28 @@ class _ConexionPrestada:
     """Envuelve una conexión ajena para usarla con ``with`` sin cerrarla."""
 
     def __init__(self, conexion: Conexion) -> None:
+        """
+        Args:
+            conexion: Conexión ya abierta por otro, que no hay que cerrar.
+        """
         self._conexion = conexion
 
     def __enter__(self) -> Conexion:
+        """
+        Entrega la conexión prestada sin abrir ninguna nueva.
+
+        Returns:
+            La misma conexión que se recibió.
+        """
         return self._conexion
 
     def __exit__(self, *_excepcion: object) -> bool:
+        """
+        Sale del bloque sin cerrar la conexión, que es de quien la prestó.
+
+        Returns:
+            False, para que cualquier excepción siga su curso.
+        """
         return False
 
 
