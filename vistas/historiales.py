@@ -20,7 +20,7 @@ from modulos.inventario.servicios import ServicioInventario
 from modulos.productos.modelos import CambioPrecio
 from modulos.productos.servicios import ServicioProductos
 from nucleo.errores import ErrorAplicacion
-from tema import ACENTO, ERROR, ESPACIO, EXITO, TEXTO, AVISO
+from tema import ACENTO, AVISO, ERROR, EXITO, TEXTO
 from vistas.componentes.campos import campo_seleccion
 from vistas.componentes.layout import pantalla
 from vistas.componentes.notificaciones import avisar_error

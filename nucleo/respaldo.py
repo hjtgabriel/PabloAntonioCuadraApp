@@ -32,7 +32,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from config import RAIZ_PROYECTO, obtener_configuracion
@@ -57,7 +57,7 @@ CARPETAS_HABITUALES_UNIX = (
 )
 
 
-class TipoRespaldo(str, Enum):
+class TipoRespaldo(StrEnum):
     """
     Clase de respaldo dentro de la rotación abuelo-padre-hijo.
 
@@ -70,7 +70,7 @@ class TipoRespaldo(str, Enum):
     MENSUAL = "mensual"
 
     @classmethod
-    def segun_fecha(cls, momento: date) -> "TipoRespaldo":
+    def segun_fecha(cls, momento: date) -> TipoRespaldo:
         """
         Decide qué clase de respaldo toca en una fecha dada.
 
@@ -100,7 +100,7 @@ class TipoRespaldo(str, Enum):
         return self is not TipoRespaldo.DIARIO
 
     @property
-    def clases_que_reemplaza(self) -> tuple["TipoRespaldo", ...]:
+    def clases_que_reemplaza(self) -> tuple[TipoRespaldo, ...]:
         """Clases de respaldo que quedan cubiertas por esta una vez verificada."""
         if self is TipoRespaldo.MENSUAL:
             return (TipoRespaldo.DIARIO, TipoRespaldo.SEMANAL)

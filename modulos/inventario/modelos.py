@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class TipoMovimiento(str, Enum):
+class TipoMovimiento(StrEnum):
     """
     Clases de movimiento que puede sufrir el stock (RF05).
 
-    Hereda de ``str`` para que el valor viaje tal cual a la base de datos y los
+    Es un ``StrEnum`` para que el valor viaje tal cual a la base de datos y los
     registros históricos sigan siendo legibles.
     """
 
@@ -21,7 +21,7 @@ class TipoMovimiento(str, Enum):
     AJUSTE = "Ajuste"
 
     @classmethod
-    def desde_texto(cls, valor: str) -> "TipoMovimiento":
+    def desde_texto(cls, valor: str) -> TipoMovimiento:
         """
         Convierte el texto elegido en la interfaz al tipo correspondiente.
 

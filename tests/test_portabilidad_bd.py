@@ -110,12 +110,12 @@ def _importa_el_driver(ruta: pathlib.Path) -> bool:
     """
     arbol = ast.parse(ruta.read_text(encoding="utf-8"))
     for nodo in ast.walk(arbol):
-        if isinstance(nodo, ast.Import):
-            if any(alias.name.split(".")[0] == "psycopg2" for alias in nodo.names):
-                return True
-        elif isinstance(nodo, ast.ImportFrom):
-            if (nodo.module or "").split(".")[0] == "psycopg2":
-                return True
+        if isinstance(nodo, ast.Import) and any(
+            alias.name.split(".")[0] == "psycopg2" for alias in nodo.names
+        ):
+            return True
+        if isinstance(nodo, ast.ImportFrom) and (nodo.module or "").split(".")[0] == "psycopg2":
+            return True
     return False
 
 

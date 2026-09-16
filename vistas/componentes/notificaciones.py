@@ -16,7 +16,7 @@ import logging
 
 import flet as ft
 
-from tema import ERROR, EXITO, RADIO_BORDE, SUPERFICIE, TEXTO, AVISO
+from tema import AVISO, ERROR, EXITO, RADIO_BORDE, SUPERFICIE, TEXTO
 
 logger = logging.getLogger(__name__)
 
