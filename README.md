@@ -74,6 +74,13 @@ Lo que vea en el menú depende de su rol:
 Al entrar, si algún producto llegó a su stock mínimo, aparece un aviso con los
 nombres.
 
+### 2.1.1. Ocultar el menú
+
+El botón **☰** de la barra superior pliega el menú lateral, y la sección
+abierta pasa a ocupar el ancho completo de la ventana. Viene bien en las
+pantallas de tablas anchas, como el catálogo de productos. El botón se queda a
+la vista para volver a mostrarlo.
+
 ### 2.2. Vender
 
 1. Abra **Punto de venta**.

@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 ANCHO_MENU = 230
 MAX_PRODUCTOS_EN_ALERTA = 4
+AYUDA_OCULTAR_MENU = "Ocultar el menú"
+AYUDA_MOSTRAR_MENU = "Mostrar el menú"
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +134,12 @@ class PanelPrincipal:
         self._contenido = ft.Container(expand=True)
         self._menu = self._construir_menu()
         self._lateral = ft.Container(content=self._menu, bgcolor=NAV_BG, width=ANCHO_MENU)
+        self._boton_menu = ft.IconButton(
+            icon=ft.Icons.MENU_OPEN,
+            icon_color=TEXTO,
+            tooltip=AYUDA_OCULTAR_MENU,
+            on_click=self._alternar_menu,
+        )
 
     def construir(self) -> ft.Control:
         """
@@ -207,6 +215,7 @@ class PanelPrincipal:
         return ft.Container(
             content=ft.Row(
                 [
+                    self._boton_menu,
                     ft.Text(
                         f"Bienvenido, {self._sesion.nombre_completo}",
                         size=TEXTO_SUBTITULO,
@@ -226,6 +235,26 @@ class PanelPrincipal:
         )
 
     # ── Navegación ──────────────────────────────────────────────
+
+    def _alternar_menu(self, _evento: ft.ControlEvent) -> None:
+        """
+        Muestra u oculta el menú lateral.
+
+        Al ocultarlo, la sección abierta pasa a ocupar el ancho completo de la
+        ventana, que es lo que se agradece en las tablas anchas como la del
+        catálogo de productos o la de ventas.
+
+        Args:
+            _evento: Evento del botón, que no se usa.
+        """
+        self._lateral.visible = not self._lateral.visible
+        self._boton_menu.icon = (
+            ft.Icons.MENU_OPEN if self._lateral.visible else ft.Icons.MENU
+        )
+        self._boton_menu.tooltip = (
+            AYUDA_OCULTAR_MENU if self._lateral.visible else AYUDA_MOSTRAR_MENU
+        )
+        self._pagina.update()
 
     def _al_cambiar_seccion(self, evento: ft.ControlEvent) -> None:
         """

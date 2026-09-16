@@ -10,10 +10,13 @@ de una API que no existe en Flet 0.86.5.
 
 from __future__ import annotations
 
+import flet as ft
 import pytest
 
 from modulos.personal.modelos import UsuarioAutenticado
 from vistas.dashboard import (
+    AYUDA_MOSTRAR_MENU,
+    AYUDA_OCULTAR_MENU,
     SECCIONES,
     PanelPrincipal,
     _resumen_alertas,
@@ -167,3 +170,76 @@ def test_el_aviso_de_stock_resume_cuando_son_muchos():
     assert "Producto 0" in texto
     assert "Producto 9" not in texto
     assert "y 6 más" in texto
+
+
+# ── Menú plegable ───────────────────────────────────────────────────────
+
+
+def panel_construido(pagina) -> PanelPrincipal:
+    """
+    Arma un panel ya construido, listo para interactuar.
+
+    Args:
+        pagina: Página falsa sobre la que dibujarlo.
+
+    Returns:
+        El panel con su primera sección abierta.
+    """
+    panel = PanelPrincipal(pagina, sesion("Administrador"), lambda: None)
+    panel.construir()
+    return panel
+
+
+def test_el_menu_empieza_visible(producto_demo, pagina):
+    """Al entrar, el menú lateral se ve: es la forma de navegar."""
+    assert panel_construido(pagina)._lateral.visible is True
+
+
+def test_el_boton_de_hamburguesa_oculta_el_menu(producto_demo, pagina):
+    """Pulsarlo deja la sección abierta a lo ancho de toda la ventana."""
+    panel = panel_construido(pagina)
+
+    panel._alternar_menu(None)
+
+    assert panel._lateral.visible is False
+
+
+def test_el_boton_de_hamburguesa_vuelve_a_mostrar_el_menu(producto_demo, pagina):
+    """Un segundo clic devuelve el menú: no puede quedarse escondido."""
+    panel = panel_construido(pagina)
+
+    panel._alternar_menu(None)
+    panel._alternar_menu(None)
+
+    assert panel._lateral.visible is True
+
+
+def test_el_icono_y_la_ayuda_reflejan_el_estado_del_menu(producto_demo, pagina):
+    """El botón debe decir qué hará al pulsarlo, no en qué estado está."""
+    panel = panel_construido(pagina)
+
+    assert panel._boton_menu.tooltip == AYUDA_OCULTAR_MENU
+    assert panel._boton_menu.icon == ft.Icons.MENU_OPEN
+
+    panel._alternar_menu(None)
+
+    assert panel._boton_menu.tooltip == AYUDA_MOSTRAR_MENU
+    assert panel._boton_menu.icon == ft.Icons.MENU
+
+
+def test_el_boton_de_hamburguesa_esta_en_la_cabecera(producto_demo, pagina):
+    """Debe quedar a la vista aunque el menú esté oculto (si no, no hay vuelta)."""
+    panel = panel_construido(pagina)
+    cabecera = panel._cabecera()
+
+    assert panel._boton_menu in cabecera.content.controls
+
+
+def test_ocultar_el_menu_no_cierra_la_seccion_abierta(producto_demo, pagina):
+    """Plegar el menú es solo visual: el contenido sigue en su sitio."""
+    panel = panel_construido(pagina)
+    antes = panel._contenido.content
+
+    panel._alternar_menu(None)
+
+    assert panel._contenido.content is antes
