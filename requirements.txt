@@ -1,0 +1,8 @@
+# Dependencias de ejecución
+flet==0.86.5
+psycopg2-binary>=2.9,<3.0
+pydantic>=2.0,<3.0
+pydantic-settings>=2.0,<3.0
+
+# Dependencias de desarrollo y pruebas
+pytest>=8.0

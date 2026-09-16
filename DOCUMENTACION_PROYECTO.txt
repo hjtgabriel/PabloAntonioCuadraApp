@@ -1,0 +1,116 @@
+# Contexto del Proyecto: Sistema de Gestión y Venta para Librería
+Framework: Flet 0.86.5
+Base de Datos: PostgreSQL
+Arquitectura: Monolito Modular
+
+## 1. Requerimientos Funcionales (RF)
+* RF01: El sistema debe permitir el inicio de sesión mediante usuario y contraseña para controlar el acceso.
+* RF02: El sistema debe manejar dos roles de usuario (vendedor y Administración) restringiendo las funciones disponibles según el perfil.
+* RF03: El sistema debe permitir registrar, modificar y consultar productos, capturando obligatoriamente Marca, Categoría, Precio.
+* RF04: El sistema debe descontar automáticamente el stock del producto al momento de realizar una venta.
+* RF05: El sistema debe registrar un historial de entradas, salidas y ajustes de inventario, indicando fecha, cantidad y tipo de operación.
+* RF06: El sistema debe mantener un historial de precios que permita consultar la evolución de costos de cada producto.
+* RF07: El sistema debe generar una alerta automática cuando el stock de un producto alcance o caiga por debajo de un límite mínimo establecido.
+* RF08: El sistema debe permitir la búsqueda rápida de artículos por nombre.
+* RF09: El sistema debe calcular automáticamente el total a cobrar por venta.
+* RF10: El sistema debe procesar la venta sin requerir datos obligatorios del cliente y sin aplicar descuentos.
+* RF11: El sistema debe generar reportes de ventas semanales, incluyendo el total recibido en efectivo y el cambio entregado.
+* RF12: El sistema debe generar un listado de los artículos más vendidos.
+* RF13: El sistema debe generar un reporte del nivel de stock actual por producto para identificar cuándo reabastecer.
+
+## 2. Requerimientos No Funcionales (RNF)
+* RNF01: El sistema y su base de datos deben instalarse y ejecutarse localmente (arquitectura de escritorio).
+* RNF02: El sistema debe operar en el equipo de cómputo que la librería ya posee, sin requerir servidor dedicado.
+* RNF03: La interfaz debe priorizar funcionalidad y legibilidad sobre estética, usando colores neutros y controles estándar.
+* RNF04: Las contraseñas de los usuarios deben almacenarse de forma cifrada (OBLIGATORIO).
+* RNF05: El sistema debe implementar las estrategias de respaldo 3-2-1.
+* RNF06: El sistema debe procesar y registrar una venta en un tiempo no mayor a 3 segundos.
+* RNF07: El sistema debe soportar el registro de al menos 1,000 productos en el catálogo sin afectar su rendimiento.
+* RNF08: El sistema debe incluir un manual de usuario básico.
+
+## 3. Esquema de Base de Datos (PostgreSQL)
+
+```sql
+-- Tablas de Catálogos / Independientes
+CREATE TABLE rol (
+    idrol SERIAL PRIMARY KEY,
+    nombrerol VARCHAR(50)
+);
+
+CREATE TABLE categoria (
+    idcategoria SERIAL PRIMARY KEY,
+    nombre VARCHAR(100)
+);
+
+CREATE TABLE marca (
+    idmarca SERIAL PRIMARY KEY,
+    nombremarca VARCHAR(100)
+);
+
+CREATE TABLE proveedor (
+    idproveedor SERIAL PRIMARY KEY,
+    nombreproveedor VARCHAR(150),
+    telefono VARCHAR(20),
+    direccion VARCHAR(255)
+);
+
+CREATE TABLE empleado (
+    idempleado SERIAL PRIMARY KEY,
+    nombres VARCHAR(100),
+    apellidos VARCHAR(100),
+    direccion VARCHAR(255),
+    telefono VARCHAR(20)
+);
+
+-- Tablas con Relaciones (Dependientes)
+CREATE TABLE usuario (
+    idusuario SERIAL PRIMARY KEY,
+    idempleado INTEGER REFERENCES empleado(idempleado),
+    idrol INTEGER REFERENCES rol(idrol),
+    nombreusuario VARCHAR(100) UNIQUE,
+    contrasena VARCHAR(255)
+);
+
+CREATE TABLE producto (
+    idproducto SERIAL PRIMARY KEY,
+    descripcion VARCHAR(255),
+    idcategoria INTEGER REFERENCES categoria(idcategoria),
+    idmarca INTEGER REFERENCES marca(idmarca),
+    idproveedor INTEGER REFERENCES proveedor(idproveedor),
+    preciocompra NUMERIC(18,2),
+    precioventa NUMERIC(18,2),
+    stock INTEGER,
+    stockminimo INTEGER
+);
+
+CREATE TABLE historialprecios (
+    idhistorial SERIAL PRIMARY KEY,
+    idproducto INTEGER REFERENCES producto(idproducto),
+    fechacambio TIMESTAMP WITHOUT TIME ZONE,
+    precioanterior NUMERIC(18,2),
+    precionuevo NUMERIC(18,2)
+);
+
+CREATE TABLE inventario (
+    idinventario SERIAL PRIMARY KEY,
+    idproducto INTEGER REFERENCES producto(idproducto),
+    fechamovimiento TIMESTAMP WITHOUT TIME ZONE,
+    tipomovimiento VARCHAR(50),
+    cantidad INTEGER
+);
+
+CREATE TABLE venta (
+    idventa SERIAL PRIMARY KEY,
+    idusuario INTEGER REFERENCES usuario(idusuario),
+    fechaventa TIMESTAMP WITHOUT TIME ZONE,
+    totalventa NUMERIC(18,2),
+    efectivorecibido NUMERIC(18,2),
+    cambioentregado NUMERIC(18,2)
+);
+
+CREATE TABLE detalleventa (
+    iddetalleventa SERIAL PRIMARY KEY,
+    idventa INTEGER REFERENCES venta(idventa),
+    idproducto INTEGER REFERENCES producto(idproducto),
+    cantidad INTEGER
+);

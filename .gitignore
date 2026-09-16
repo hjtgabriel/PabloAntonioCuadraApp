@@ -1,0 +1,31 @@
+# Entorno y secretos
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Pruebas y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Respaldos generados (RNF05)
+respaldos/
+*.dump
+*.sql.gz
+
+# Registro de eventos de la aplicación
+logs/
+*.log
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
