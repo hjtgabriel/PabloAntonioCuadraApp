@@ -307,7 +307,12 @@ modulos/                 Lógica de negocio, un módulo por capacidad
 
 vistas/                  Interfaz
   componentes/           Piezas reutilizables
+    campos.py            Fábrica de campos con validación
+    dialogos.py          Formularios y confirmaciones
+    tablas.py            Tabla con paginación y acciones
+    registros.py         Lectura de registros y precarga de formularios
   crud.py                Pantalla de mantenimiento genérica
+  dashboard.py           Panel principal y menú por rol (RF02)
   *.py                   Una pantalla por sección
 
 herramientas/            Utilidades de instalación
@@ -331,6 +336,49 @@ python -m pytest
 
 Las pruebas corren sobre SQLite en memoria, así que no hace falta tener
 PostgreSQL levantado.
+
+### Comprobaciones de calidad
+
+Antes de confirmar un cambio conviene pasar las tres comprobaciones:
+
+```bash
+python -m pytest                       # las pruebas, todas en verde
+python -m ruff check .                 # linter, sin avisos
+python -m pytest --cov=. --cov-report=term-missing   # cobertura
+```
+
+El linter se configura en `pyproject.toml` (reglas `E`, `F`, `W`, `I`, `UP`,
+`B`, `SIM`, línea de 100). `python -m ruff check . --fix` corrige solo lo que
+puede arreglar sin cambiar el comportamiento.
+
+### Cómo se declaran los formularios
+
+Un campo de un formulario se declara una sola vez, con
+`definir_campo(clave, etiqueta, fabrica, ...)`:
+
+```python
+definir_campo(
+    "descripcion",
+    "Descripción",
+    obligatorio=True,
+    valor=valor("descripcion"),
+    icono=ft.Icons.DESCRIPTION,
+)
+```
+
+- `clave` es el nombre con el que el valor llega al servicio.
+- `etiqueta` se usa a la vez para el rótulo y para los mensajes de error, de
+  modo que nunca puedan quedar diciendo cosas distintas.
+- `fabrica` es la función de `vistas/componentes/campos.py` que crea el control
+  (`campo_texto` si se omite, o `campo_decimal`, `campo_entero`,
+  `campo_seleccion`, `campo_contrasena`).
+- `obligatorio` marca el asterisco del rótulo y activa la validación, en una
+  sola declaración.
+
+Para precargar un formulario al editar se usa `lector(registro)` o
+`lector_de_texto(registro)` de `vistas/componentes/registros.py`: en un alta el
+registro es `None` y cada campo sale con su valor inicial, sin repetir un
+condicional por campo.
 
 ### Cambiar de motor de base de datos
 
