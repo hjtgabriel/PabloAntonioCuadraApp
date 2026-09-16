@@ -10,4 +10,6 @@ aspecto y comportamiento y que un cambio visual se haga en un solo sitio:
 * :mod:`~vistas.componentes.tablas` – tabla con paginación y acciones.
 * :mod:`~vistas.componentes.busqueda` – barra de búsqueda con espera.
 * :mod:`~vistas.componentes.layout` – encabezados, tarjetas e indicadores.
+* :mod:`~vistas.componentes.registros` – lectura de registros y precarga
+  de formularios, sea el registro un diccionario o un objeto de dominio.
 """

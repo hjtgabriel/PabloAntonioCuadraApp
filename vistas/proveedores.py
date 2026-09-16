@@ -5,9 +5,10 @@ from __future__ import annotations
 import flet as ft
 
 from modulos.proveedores.servicios import ServicioProveedores
-from vistas.componentes.campos import campo_texto, longitud_minima
-from vistas.componentes.dialogos import Campo
-from vistas.componentes.tablas import Columna, leer_valor
+from vistas.componentes.campos import longitud_minima
+from vistas.componentes.dialogos import Campo, definir_campo
+from vistas.componentes.registros import lector_de_texto
+from vistas.componentes.tablas import Columna
 from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
 
 LONGITUD_MINIMA_NOMBRE = 2
@@ -27,36 +28,19 @@ def pantalla_proveedores(pagina: ft.Page) -> ft.Control:
 
     def construir_campos(registro: object | None) -> list[Campo]:
         """Arma el formulario, precargado si se está editando."""
+        valor = lector_de_texto(registro)
         return [
-            Campo(
+            definir_campo(
                 "nombreproveedor",
                 "Nombre del proveedor",
-                campo_texto(
-                    "Nombre del proveedor",
-                    obligatorio=True,
-                    valor=leer_valor(registro, "nombreproveedor", "") if registro else "",
-                    icono=ft.Icons.LOCAL_SHIPPING,
-                    validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "El nombre"),
-                ),
                 obligatorio=True,
+                valor=valor("nombreproveedor"),
+                icono=ft.Icons.LOCAL_SHIPPING,
+                validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "El nombre"),
             ),
-            Campo(
-                "telefono",
-                "Teléfono",
-                campo_texto(
-                    "Teléfono",
-                    valor=leer_valor(registro, "telefono", "") or "" if registro else "",
-                    icono=ft.Icons.PHONE,
-                ),
-            ),
-            Campo(
-                "direccion",
-                "Dirección",
-                campo_texto(
-                    "Dirección",
-                    valor=leer_valor(registro, "direccion", "") or "" if registro else "",
-                    icono=ft.Icons.LOCATION_ON,
-                ),
+            definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+            definir_campo(
+                "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
             ),
         ]
 

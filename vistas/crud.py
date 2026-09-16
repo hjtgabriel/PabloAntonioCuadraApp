@@ -24,7 +24,8 @@ from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.dialogos import Campo, DialogoConfirmacion, DialogoFormulario
 from vistas.componentes.layout import pantalla_con_boton
 from vistas.componentes.notificaciones import avisar_error, avisar_exito
-from vistas.componentes.tablas import Columna, TablaDatos, leer_valor
+from vistas.componentes.registros import leer_valor
+from vistas.componentes.tablas import Columna, TablaDatos
 
 
 @dataclass(slots=True)

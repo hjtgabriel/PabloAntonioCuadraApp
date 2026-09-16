@@ -16,9 +16,10 @@ from modulos.catalogos.servicios import (
     servicio_roles,
 )
 from nucleo.servicio import ServicioCatalogo
-from vistas.componentes.campos import campo_texto, longitud_minima
-from vistas.componentes.dialogos import Campo
-from vistas.componentes.tablas import Columna, leer_valor
+from vistas.componentes.campos import longitud_minima
+from vistas.componentes.dialogos import Campo, definir_campo
+from vistas.componentes.registros import lector_de_texto
+from vistas.componentes.tablas import Columna
 from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
 
 LONGITUD_MINIMA = 2
@@ -52,17 +53,13 @@ def _pantalla_catalogo(
     def construir_campos(registro: dict | None) -> list[Campo]:
         """Arma el formulario, precargado si se está editando."""
         return [
-            Campo(
-                clave=columna_nombre,
-                etiqueta=titulo_columna,
+            definir_campo(
+                columna_nombre,
+                titulo_columna,
                 obligatorio=True,
-                control=campo_texto(
-                    titulo_columna,
-                    obligatorio=True,
-                    valor=leer_valor(registro, columna_nombre, "") if registro else "",
-                    icono=icono,
-                    validador=longitud_minima(LONGITUD_MINIMA, titulo_columna),
-                ),
+                valor=lector_de_texto(registro)(columna_nombre),
+                icono=icono,
+                validador=longitud_minima(LONGITUD_MINIMA, titulo_columna),
             )
         ]
 

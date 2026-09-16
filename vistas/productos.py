@@ -7,6 +7,7 @@ desplegables de relaciones y el resaltado por color del nivel de existencias.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal
 
 import flet as ft
@@ -20,14 +21,16 @@ from vistas.componentes.campos import (
     campo_decimal,
     campo_entero,
     campo_seleccion,
-    campo_texto,
     longitud_minima,
 )
-from vistas.componentes.dialogos import Campo
+from vistas.componentes.dialogos import Campo, definir_campo
+from vistas.componentes.registros import lector
 from vistas.componentes.tablas import Columna
 from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
 
 LONGITUD_MINIMA_DESCRIPCION = 2
+STOCK_MINIMO_PREDETERMINADO = 5
+STOCK_INICIAL_PREDETERMINADO = 0
 
 
 def _construir_campos(producto: Producto | None) -> list[Campo]:
@@ -40,85 +43,67 @@ def _construir_campos(producto: Producto | None) -> list[Campo]:
     Returns:
         Los campos del formulario, en orden de aparición.
     """
+    valor = lector(producto)
     return [
-        Campo(
+        definir_campo(
             "descripcion",
             "Descripción",
-            campo_texto(
-                "Descripción",
-                obligatorio=True,
-                valor=producto.descripcion if producto else "",
-                icono=ft.Icons.DESCRIPTION,
-                validador=longitud_minima(LONGITUD_MINIMA_DESCRIPCION, "La descripción"),
-            ),
             obligatorio=True,
+            valor=valor("descripcion"),
+            icono=ft.Icons.DESCRIPTION,
+            validador=longitud_minima(LONGITUD_MINIMA_DESCRIPCION, "La descripción"),
         ),
-        Campo(
-            "idcategoria",
-            "Categoría",
-            campo_seleccion(
-                "Categoría",
-                _opciones_categoria(),
-                obligatorio=True,
-                valor=producto.idcategoria if producto else None,
-            ),
-            obligatorio=True,
-        ),
-        Campo(
-            "idmarca",
-            "Marca",
-            campo_seleccion(
-                "Marca",
-                _opciones_marca(),
-                obligatorio=True,
-                valor=producto.idmarca if producto else None,
-            ),
-            obligatorio=True,
-        ),
-        Campo(
-            "idproveedor",
-            "Proveedor",
-            campo_seleccion(
-                "Proveedor",
-                _opciones_proveedor(),
-                obligatorio=True,
-                valor=producto.idproveedor if producto else None,
-            ),
-            obligatorio=True,
-        ),
-        Campo(
+        *_campos_de_relacion(valor),
+        definir_campo(
             "preciocompra",
             "Precio de compra",
-            campo_decimal(
-                "Precio de compra",
-                obligatorio=True,
-                valor=producto.preciocompra if producto else "0.00",
-            ),
+            campo_decimal,
             obligatorio=True,
+            valor=valor("preciocompra", "0.00"),
         ),
-        Campo(
+        definir_campo(
             "precioventa",
             "Precio de venta",
-            campo_decimal(
-                "Precio de venta",
-                obligatorio=True,
-                valor=producto.precioventa if producto else "0.00",
-                minimo=Decimal("0.01"),
-            ),
+            campo_decimal,
             obligatorio=True,
+            valor=valor("precioventa", "0.00"),
+            minimo=Decimal("0.01"),
         ),
-        Campo(
+        definir_campo(
             "stockminimo",
             "Stock mínimo",
-            campo_entero(
-                "Stock mínimo",
-                obligatorio=True,
-                valor=producto.stockminimo if producto else 5,
-                icono=ft.Icons.WARNING_AMBER,
-            ),
+            campo_entero,
             obligatorio=True,
+            valor=valor("stockminimo", STOCK_MINIMO_PREDETERMINADO),
+            icono=ft.Icons.WARNING_AMBER,
         ),
         *_campo_stock_inicial(producto),
+    ]
+
+
+def _campos_de_relacion(valor: Callable[..., object]) -> list[Campo]:
+    """
+    Arma los tres desplegables que enlazan el producto con sus catálogos.
+
+    Los tres se declaran igual, así que se generan a partir de una tabla en
+    lugar de repetir la misma llamada tres veces.
+
+    Args:
+        valor: Lector del producto que se está editando.
+
+    Returns:
+        Los desplegables de categoría, marca y proveedor.
+    """
+    return [
+        definir_campo(
+            clave,
+            etiqueta,
+            campo_seleccion,
+            obligatorio=True,
+            opciones=cargar_opciones(),
+            valor=valor(clave, None),
+        )
+        for clave, etiqueta, cargar_opciones in RELACIONES_DEL_PRODUCTO
     ]
 
 
@@ -180,10 +165,12 @@ def _campo_stock_inicial(producto: Producto | None) -> list[Campo]:
     if producto is not None:
         return []
     return [
-        Campo(
+        definir_campo(
             "stock",
             "Stock inicial",
-            campo_entero("Stock inicial", valor=0, icono=ft.Icons.INVENTORY_2),
+            campo_entero,
+            valor=STOCK_INICIAL_PREDETERMINADO,
+            icono=ft.Icons.INVENTORY_2,
         )
     ]
 
@@ -230,3 +217,11 @@ def _color_stock(producto: Producto) -> str:
         El color correspondiente al nivel de existencias.
     """
     return color_estado_stock(producto.stock, producto.stockminimo)
+
+
+RELACIONES_DEL_PRODUCTO: tuple[tuple[str, str, Callable[[], list[tuple[object, str]]]], ...] = (
+    ("idcategoria", "Categoría", _opciones_categoria),
+    ("idmarca", "Marca", _opciones_marca),
+    ("idproveedor", "Proveedor", _opciones_proveedor),
+)
+"""Desplegables que enlazan el producto con sus catálogos: clave, rótulo y origen."""

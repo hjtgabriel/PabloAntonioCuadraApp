@@ -15,11 +15,11 @@ from modulos.personal.servicios import ServicioEmpleados, ServicioUsuarios
 from vistas.componentes.campos import (
     campo_contrasena,
     campo_seleccion,
-    campo_texto,
     longitud_minima,
 )
-from vistas.componentes.dialogos import Campo
-from vistas.componentes.tablas import Columna, leer_valor
+from vistas.componentes.dialogos import Campo, definir_campo
+from vistas.componentes.registros import lector, lector_de_texto
+from vistas.componentes.tablas import Columna
 from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
 
 LONGITUD_MINIMA_NOMBRE = 2
@@ -38,43 +38,71 @@ def _campos_persona(registro: object | None) -> list[Campo]:
         Campos de nombres, apellidos, dirección y teléfono.
     """
 
-    def valor(clave: str) -> str:
-        return str(leer_valor(registro, clave, "") or "") if registro else ""
-
+    valor = lector_de_texto(registro)
     return [
-        Campo(
+        definir_campo(
             "nombres",
             "Nombres",
-            campo_texto(
-                "Nombres",
-                obligatorio=True,
-                valor=valor("nombres"),
-                icono=ft.Icons.PERSON,
-                validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "Los nombres"),
-            ),
             obligatorio=True,
+            valor=valor("nombres"),
+            icono=ft.Icons.PERSON,
+            validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "Los nombres"),
         ),
-        Campo(
+        definir_campo(
             "apellidos",
             "Apellidos",
-            campo_texto(
-                "Apellidos",
-                obligatorio=True,
-                valor=valor("apellidos"),
-                icono=ft.Icons.PERSON_OUTLINE,
-                validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "Los apellidos"),
-            ),
             obligatorio=True,
+            valor=valor("apellidos"),
+            icono=ft.Icons.PERSON_OUTLINE,
+            validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "Los apellidos"),
         ),
-        Campo(
-            "direccion",
-            "Dirección",
-            campo_texto("Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON),
+        definir_campo(
+            "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
         ),
-        Campo(
-            "telefono",
-            "Teléfono",
-            campo_texto("Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+        definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+    ]
+
+
+def _campos_usuario(registro: object | None) -> list[Campo]:
+    """
+    Arma el formulario de usuario, precargado si se está editando.
+
+    A los datos personales les añade la credencial. Al editar, la contraseña
+    deja de ser obligatoria: en blanco significa conservar la actual, de modo
+    que nunca hace falta mostrar ni volver a escribir la que ya existe.
+
+    Args:
+        registro: Usuario a editar, o None si es un alta.
+
+    Returns:
+        Los campos del formulario, en orden de aparición.
+    """
+    editando = registro is not None
+    valor = lector(registro)
+    return [
+        *_campos_persona(registro),
+        definir_campo(
+            "nombreusuario",
+            "Nombre de usuario",
+            obligatorio=True,
+            valor=str(valor("nombreusuario")),
+            icono=ft.Icons.ACCOUNT_CIRCLE,
+            validador=longitud_minima(LONGITUD_MINIMA_USUARIO, "El nombre de usuario"),
+        ),
+        definir_campo(
+            "contrasena",
+            "Contraseña",
+            campo_contrasena,
+            obligatorio=not editando,
+            ayuda=AYUDA_CONTRASENA_EDICION if editando else None,
+        ),
+        definir_campo(
+            "idrol",
+            "Rol",
+            campo_seleccion,
+            obligatorio=True,
+            opciones=_opciones_rol(),
+            valor=valor("idrol", None),
         ),
     ]
 
@@ -131,51 +159,6 @@ def pantalla_usuarios(pagina: ft.Page) -> ft.Control:
     """
     servicio = ServicioUsuarios()
 
-    def construir_campos(registro: object | None) -> list[Campo]:
-        """Arma el formulario de usuario, precargado si se está editando."""
-        editando = registro is not None
-        campos = _campos_persona(registro)
-        campos.append(
-            Campo(
-                "nombreusuario",
-                "Nombre de usuario",
-                campo_texto(
-                    "Nombre de usuario",
-                    obligatorio=True,
-                    valor=str(leer_valor(registro, "nombreusuario", "") or "") if editando else "",
-                    icono=ft.Icons.ACCOUNT_CIRCLE,
-                    validador=longitud_minima(LONGITUD_MINIMA_USUARIO, "El nombre de usuario"),
-                ),
-                obligatorio=True,
-            )
-        )
-        campos.append(
-            Campo(
-                "contrasena",
-                "Contraseña",
-                campo_contrasena(
-                    "Contraseña",
-                    obligatorio=not editando,
-                    ayuda=AYUDA_CONTRASENA_EDICION if editando else None,
-                ),
-                obligatorio=not editando,
-            )
-        )
-        campos.append(
-            Campo(
-                "idrol",
-                "Rol",
-                campo_seleccion(
-                    "Rol",
-                    _opciones_rol(),
-                    obligatorio=True,
-                    valor=leer_valor(registro, "idrol") if editando else None,
-                ),
-                obligatorio=True,
-            )
-        )
-        return campos
-
     return construir_pantalla_crud(
         pagina,
         ConfiguracionCrud(
@@ -189,7 +172,7 @@ def pantalla_usuarios(pagina: ft.Page) -> ft.Control:
                 Columna("apellidos", "Apellidos", formato=lambda valor: valor or "—"),
                 Columna("rol", "Rol"),
             ],
-            construir_campos=construir_campos,
+            construir_campos=_campos_usuario,
             listar=servicio.listar,
             crear=servicio.crear_con_empleado,
             actualizar=servicio.actualizar,

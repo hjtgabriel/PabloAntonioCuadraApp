@@ -31,6 +31,7 @@ from tema import (
     TEXTO_ATENUADO,
 )
 from vistas.componentes.refresco import refrescar
+from vistas.componentes.registros import leer_valor
 
 FILAS_POR_PAGINA = 25
 MAX_BOTONES_PAGINA = 7
@@ -69,23 +70,6 @@ class Columna:
         if self.formato is not None:
             return self.formato(valor)
         return "" if valor is None else str(valor)
-
-
-def leer_valor(fila: Any, clave: str, por_omision: Any = None) -> Any:
-    """
-    Lee un campo de una fila, ya sea un diccionario o un objeto.
-
-    Args:
-        fila: Registro del que leer.
-        clave: Nombre del campo.
-        por_omision: Valor a devolver si el campo no existe.
-
-    Returns:
-        El valor encontrado, o ``por_omision``.
-    """
-    if isinstance(fila, dict):
-        return fila.get(clave, por_omision)
-    return getattr(fila, clave, por_omision)
 
 
 class TablaDatos(ft.Column):

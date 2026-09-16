@@ -29,6 +29,7 @@ from tema import (
     TEXTO_SUBTITULO,
     estilo_boton,
 )
+from vistas.componentes.campos import campo_texto
 from vistas.componentes.refresco import refrescar
 
 ANCHO_FORMULARIO = 440
@@ -50,6 +51,39 @@ class Campo:
     etiqueta: str
     control: ft.Control
     obligatorio: bool = False
+
+
+def definir_campo(
+    clave: str,
+    etiqueta: str,
+    fabrica: Callable[..., ft.Control] = campo_texto,
+    *,
+    obligatorio: bool = False,
+    **opciones: object,
+) -> Campo:
+    """
+    Declara un campo de formulario en una sola llamada.
+
+    Sin esta función cada campo repite tres veces lo mismo: la etiqueta una vez
+    para el rótulo y otra para los mensajes de error, y el ``obligatorio`` una
+    vez para la validación y otra para el asterisco del rótulo. Al repetirlo a
+    mano basta con cambiar solo una de las dos copias para que el diálogo avise
+    de un campo con un nombre que ya no es el que ve el usuario.
+
+    Args:
+        clave: Nombre con el que el valor llega al servicio.
+        etiqueta: Rótulo visible, usado también en los mensajes de error.
+        fabrica: Función de :mod:`~vistas.componentes.campos` que crea el
+            control. Todas reciben la etiqueta y ``obligatorio``.
+        obligatorio: Si el campo no puede quedar vacío.
+        **opciones: Resto de parámetros propios de la fábrica elegida, por
+            ejemplo ``valor``, ``icono``, ``validador`` u ``opciones``.
+
+    Returns:
+        El campo listo para agregar al formulario.
+    """
+    control = fabrica(etiqueta, obligatorio=obligatorio, **opciones)
+    return Campo(clave, etiqueta, control, obligatorio=obligatorio)
 
 
 class DialogoFormulario(ft.AlertDialog):
