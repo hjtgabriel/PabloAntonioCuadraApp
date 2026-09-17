@@ -399,7 +399,9 @@ class PuntoDeVenta:
         configuracion = obtener_configuracion()
         try:
             ruta = guardar(
-                componer_html(venta, configuracion.nombre_app),
+                componer_html(
+                    venta, configuracion.nombre_app, configuracion.factura_ancho_mm
+                ),
                 configuracion.carpeta_facturas,
                 nombre_archivo(venta),
             )
@@ -408,7 +410,7 @@ class PuntoDeVenta:
             return
 
         if abrir(ruta):
-            avisar_exito(self._pagina, "Factura abierta en el navegador; imprima con Ctrl+P")
+            avisar_exito(self._pagina, "Factura abierta; imprima con Ctrl+P en el navegador")
         else:
             avisar_advertencia(self._pagina, f"La factura quedó guardada en {ruta}")
 

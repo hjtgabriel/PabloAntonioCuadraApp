@@ -115,6 +115,18 @@ Cada factura queda guardada con su número y su fecha (por ejemplo
 `factura_00042_20260917_150430.html`), así que puede volver a abrirse e
 imprimirse más tarde sin pasar por el sistema.
 
+La factura está maquetada para una **impresora de tickets**, no para una hoja:
+el documento declara el ancho del rollo y el alto justo que ocupa la venta, de
+modo que el papel se corta donde termina el ticket y no se expulsa una página
+entera. Va en una sola columna, con tipografía monoespaciada para que los
+importes queden alineados, y sin fondos de color, que una térmica no imprime.
+
+Si su impresora usa otro rollo, cambie una línea en el archivo `.env`:
+
+```
+FACTURA_ANCHO_MM=80     # 80 para mostrador, 58 para portátiles
+```
+
 > Flet no incluye impresión propia, por eso la factura sale por el navegador.
 > Es también lo que permite imprimir desde cualquier equipo sin instalar nada
 > más.

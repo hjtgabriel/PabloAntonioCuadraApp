@@ -51,6 +51,15 @@ class Configuracion(BaseSettings):
     facturas_dir: str = Field(default="facturas", alias="FACTURAS_DIR")
     """Carpeta donde se guardan las facturas para poder reimprimirlas."""
 
+    factura_ancho_mm: int = Field(default=80, ge=40, le=120, alias="FACTURA_ANCHO_MM")
+    """
+    Ancho del rollo de la impresora de tickets, en milímetros.
+
+    Los dos valores habituales son 80 (mostrador) y 58 (portátiles). Cambiarlo
+    reajusta la factura entera, porque el documento se maqueta a la medida del
+    papel y no a la de una hoja.
+    """
+
     # ── Respaldos 3-2-1 (RNF05) ─────────────────────────────────
     respaldo_dir_primario: str = Field(default="respaldos/local", alias="RESPALDO_DIR_PRIMARIO")
     respaldo_dir_secundario: str = Field(default="respaldos/externo", alias="RESPALDO_DIR_SECUNDARIO")

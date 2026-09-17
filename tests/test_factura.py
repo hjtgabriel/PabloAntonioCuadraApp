@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from modulos.ventas.factura import componer_html, nombre_archivo
+from modulos.ventas.factura import alto_mm, componer_html, nombre_archivo
 from modulos.ventas.modelos import DetalleVenta, Venta
 from modulos.ventas.servicios import ServicioVentas
 from nucleo.documentos import ErrorDocumento, guardar
@@ -159,7 +159,7 @@ def test_un_vendedor_desconocido_no_deja_un_hueco():
     venta = venta_de_prueba()
     venta.nombreusuario = None
 
-    assert "Atendido por: <strong>—</strong>" in componer_html(venta, NEGOCIO)
+    assert "Atendido por: —" in componer_html(venta, NEGOCIO)
 
 
 # ── Nombre del archivo ──────────────────────────────────────────────────
@@ -336,5 +336,132 @@ def test_el_total_va_antes_del_efectivo_y_el_cambio():
     html = componer_html(venta_de_prueba(), NEGOCIO)
     totales = html.split('class="totales"')[1]
 
-    assert totales.index("TOTAL") < totales.index("Efectivo recibido")
-    assert totales.index("Efectivo recibido") < totales.index("Cambio entregado")
+    assert totales.index("TOTAL") < totales.index("Efectivo")
+    assert totales.index("Efectivo") < totales.index("Cambio")
+
+
+# ── Formato de impresora de tickets ─────────────────────────────────────
+
+
+def test_la_factura_se_maqueta_para_el_rollo_y_no_para_una_hoja():
+    """
+    El papel debe cortarse donde termina la factura, no expulsar una página.
+
+    Eso lo consigue «@page» declarando el ancho del rollo y alto automático.
+    Sin esto, una térmica saca metros de papel en blanco tras cada venta.
+    """
+    html = componer_html(venta_de_prueba(), NEGOCIO)
+
+    assert "@page { size: 80mm " in html
+    assert "mm; margin: 0; }" in html
+    assert "auto" not in html.split("@page")[1].split("}")[0]
+
+
+@pytest.mark.parametrize("ancho", [58, 80])
+def test_el_ancho_del_rollo_es_configurable(ancho):
+    """Los dos rollos habituales son 58 mm y 80 mm; ambos deben salir bien."""
+    html = componer_html(venta_de_prueba(), NEGOCIO, ancho)
+
+    assert f"size: {ancho}mm " in html
+    assert f"width: {ancho}mm" in html
+
+
+def test_la_factura_usa_tipografia_monoespaciada():
+    """Es lo que alinea los importes en columna sobre papel estrecho."""
+    html = componer_html(venta_de_prueba(), NEGOCIO)
+
+    assert "monospace" in html
+
+
+def test_la_factura_no_lleva_fondos_de_color():
+    """
+    Una impresora térmica no reproduce fondos, y en otra solo gastan tinta.
+
+    El único color declarado es el blanco del papel y el negro de la tinta.
+    """
+    html = componer_html(venta_de_prueba(), NEGOCIO)
+    estilos = html.split("<style>")[1].split("</style>")[0]
+
+    for color in ("#f4efe4", "#7b1020", "#d9d2c4", "#2b2b2b"):
+        assert color not in estilos, f"El ticket no debe llevar el color {color}"
+
+
+def test_el_boton_de_imprimir_no_sale_en_el_papel():
+    """Solo sirve en pantalla; en el ticket sería una caja negra inútil."""
+    html = componer_html(venta_de_prueba(), NEGOCIO)
+    impresion = html.split("@media print")[1]
+
+    assert ".imprimir { display: none; }" in impresion
+
+
+def test_cada_articulo_cabe_con_su_precio_unitario():
+    """
+    En 80 mm no caben cuatro columnas, así que el precio va bajo el nombre.
+
+    Sigue apareciendo: el cliente necesita ver a cuánto se le cobró la unidad.
+    """
+    html = componer_html(venta_de_prueba(), NEGOCIO)
+
+    assert "C$ 35.50 c/u" in html
+    assert "C$ 96.96 c/u" in html
+
+
+def test_la_tabla_del_ticket_tiene_tres_columnas():
+    """Cantidad, producto e importe: es lo que entra en un rollo estrecho."""
+    html = componer_html(venta_de_prueba(detalles=[]), NEGOCIO)
+
+    assert 'colspan="3"' in html
+
+
+def test_el_papel_crece_con_los_articulos():
+    """Más artículos exigen más rollo; el alto no puede ser fijo."""
+    uno = alto_mm(venta_de_prueba(detalles=venta_de_prueba().detalles[:1]), NEGOCIO)
+    dos = alto_mm(venta_de_prueba(), NEGOCIO)
+
+    assert dos > uno
+
+
+def test_un_nombre_largo_cuenta_como_varios_renglones():
+    """
+    En un papel estrecho el nombre se ajusta a dos o tres líneas.
+
+    Contarlo como un solo renglón dejaba la página corta y la factura se
+    partía en dos, con lo que el cliente se llevaba medio comprobante.
+    """
+    corto = venta_de_prueba(
+        detalles=[
+            DetalleVenta(
+                iddetalleventa=1, idventa=42, idproducto=1, cantidad=1,
+                descripcion="Lápiz", precioventa=Decimal("10"), subtotal=Decimal("10"),
+            )
+        ]
+    )
+    largo = venta_de_prueba(
+        detalles=[
+            DetalleVenta(
+                iddetalleventa=1, idventa=42, idproducto=1, cantidad=1,
+                descripcion="Cuaderno universitario de cien hojas rayado doble línea",
+                precioventa=Decimal("10"), subtotal=Decimal("10"),
+            )
+        ]
+    )
+
+    assert alto_mm(largo, NEGOCIO) > alto_mm(corto, NEGOCIO)
+
+
+def test_un_rollo_estrecho_necesita_mas_alto_que_uno_ancho():
+    """Lo que no cabe a lo ancho se gasta a lo largo."""
+    assert alto_mm(venta_de_prueba(), NEGOCIO, 58) > alto_mm(venta_de_prueba(), NEGOCIO, 80)
+
+
+def test_un_negocio_de_nombre_largo_tambien_alarga_el_papel():
+    """El encabezado se ajusta igual que los artículos y hay que contarlo."""
+    breve = alto_mm(venta_de_prueba(), "PAC", 58)
+    extenso = alto_mm(venta_de_prueba(), "Librería y Papelería Pablo Antonio Cuadra", 58)
+
+    assert extenso > breve
+
+
+def test_una_venta_sin_detalle_reserva_papel_igualmente():
+    """Sin líneas que contar, el ticket no puede quedarse sin alto."""
+    assert alto_mm(venta_de_prueba(detalles=[]), NEGOCIO) > 0
