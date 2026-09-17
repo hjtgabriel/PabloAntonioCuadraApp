@@ -23,6 +23,7 @@ import flet as ft
 from nucleo.errores import ErrorAplicacion
 from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.dialogos import Campo, DialogoConfirmacion, DialogoFormulario
+from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.layout import pantalla_con_boton
 from vistas.componentes.notificaciones import avisar_error, avisar_exito
 from vistas.componentes.registros import leer_valor
@@ -50,6 +51,9 @@ class ConfiguracionCrud:
         marcador_busqueda: Texto de ayuda de la barra de búsqueda.
         mensaje_vacio: Qué mostrar cuando no hay registros.
         texto_confirmar_borrado: Pregunta de la confirmación de borrado.
+        filtros: Filtro por marca y categoría a mostrar junto a la búsqueda,
+            o None si la pantalla no lo admite. La pantalla lo conecta a su
+            recarga; leer los valores elegidos es cosa de ``listar``.
     """
 
     titulo: str
@@ -64,6 +68,7 @@ class ConfiguracionCrud:
     marcador_busqueda: str = "Buscar…"
     mensaje_vacio: str = "No hay registros"
     texto_confirmar_borrado: str = "¿Está seguro de eliminar este registro?"
+    filtros: BarraFiltros | None = None
 
 
 class PantallaCrud:
@@ -93,6 +98,8 @@ class PantallaCrud:
         self._busqueda = BarraBusqueda(
             self._buscar, marcador=configuracion.marcador_busqueda
         )
+        if configuracion.filtros is not None:
+            configuracion.filtros.conectar(self._recargar)
 
     def construir(self) -> ft.Control:
         """
@@ -102,12 +109,17 @@ class PantallaCrud:
             El control raíz de la pantalla.
         """
         self._recargar()
+        acciones: list[ft.Control] = []
+        if self._config.filtros is not None:
+            acciones.append(self._config.filtros)
+        acciones.append(self._busqueda)
+
         return pantalla_con_boton(
             self._config.titulo,
             self._tabla,
             f"Agregar {self._config.entidad}",
             self._abrir_alta,
-            self._busqueda,
+            *acciones,
         )
 
     # ── Carga de datos ──────────────────────────────────────────

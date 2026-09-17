@@ -77,3 +77,27 @@ class CambioPrecio:
     def variacion(self) -> Decimal:
         """Diferencia entre el precio nuevo y el anterior."""
         return self.precionuevo - self.precioanterior
+
+
+@dataclass(frozen=True, slots=True)
+class FiltroCatalogo:
+    """
+    Acotación de una consulta por marca y por categoría (RF08).
+
+    Viaja entera desde la pantalla hasta el repositorio en lugar de repartir
+    dos parámetros sueltos por cada método de cada capa. Los mismos criterios
+    valen para el catálogo, para el inventario y para los dos historiales,
+    porque en los tres casos se acota por atributos del producto.
+
+    Attributes:
+        idcategoria: Categoría a la que limitar, o None para no limitar.
+        idmarca: Marca a la que limitar, o None para no limitar.
+    """
+
+    idcategoria: int | None = None
+    idmarca: int | None = None
+
+    @property
+    def vacio(self) -> bool:
+        """Indica si no hay nada que acotar y la consulta debe traerlo todo."""
+        return self.idcategoria is None and self.idmarca is None

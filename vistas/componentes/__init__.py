@@ -9,6 +9,8 @@ aspecto y comportamiento y que un cambio visual se haga en un solo sitio:
 * :mod:`~vistas.componentes.campos` – campos de formulario con validación.
 * :mod:`~vistas.componentes.tablas` – tabla con paginación y acciones.
 * :mod:`~vistas.componentes.busqueda` – barra de búsqueda con espera.
+* :mod:`~vistas.componentes.filtros` – acotación por marca y categoría,
+  compartida por el catálogo, el inventario y los dos historiales.
 * :mod:`~vistas.componentes.layout` – encabezados, tarjetas e indicadores.
 * :mod:`~vistas.componentes.registros` – lectura de registros y precarga
   de formularios, sea el registro un diccionario o un objeto de dominio.

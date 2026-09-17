@@ -16,7 +16,7 @@ import logging
 
 from modulos.inventario.modelos import Movimiento, TipoMovimiento
 from modulos.inventario.repositorio import InventarioRepositorio
-from modulos.productos.modelos import Producto
+from modulos.productos.modelos import FiltroCatalogo, Producto
 from modulos.productos.repositorio import ProductoRepositorio
 from nucleo.base_datos import Conexion, transaccion
 from nucleo.errores import ErrorNoEncontrado, ErrorStockInsuficiente, ErrorValidacion
@@ -85,17 +85,20 @@ class ServicioInventario:
             )
             return stock_final
 
-    def listar_historial(self, idproducto: int | None = None) -> list[Movimiento]:
+    def listar_historial(
+        self, idproducto: int | None = None, filtro: FiltroCatalogo | None = None
+    ) -> list[Movimiento]:
         """
         Devuelve el historial de movimientos (RF05).
 
         Args:
             idproducto: Si se indica, limita el historial a ese producto.
+            filtro: Acotación por marca y categoría del producto.
 
         Returns:
             Movimientos del más reciente al más antiguo.
         """
-        return self._repositorio.listar_historial(idproducto)
+        return self._repositorio.listar_historial(idproducto, filtro)
 
     def listar_alertas_stock(self) -> list[Producto]:
         """

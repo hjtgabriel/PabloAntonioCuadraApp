@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from modulos.productos.modelos import CambioPrecio, Producto
+from modulos.productos.modelos import CambioPrecio, FiltroCatalogo, Producto
 from nucleo.base_datos import obtener_motor
 from nucleo.repositorio import RepositorioBase
 
@@ -17,6 +17,54 @@ CONSULTA_PRODUCTOS_CON_RELACIONES = """
     LEFT JOIN marca m ON p.idmarca = m.idmarca
     LEFT JOIN proveedor pr ON p.idproveedor = pr.idproveedor
 """
+
+
+def condiciones_de_filtro(
+    filtro: FiltroCatalogo | None, alias: str = "p"
+) -> tuple[list[str], list[object]]:
+    """
+    Traduce un filtro de catálogo a condiciones SQL.
+
+    Está aquí una sola vez porque las tres consultas que lo usan —catálogo,
+    historial de precios e historial de inventario— acotan por los mismos dos
+    campos del producto. El alias es parámetro porque cada consulta nombra la
+    tabla «producto» a su manera.
+
+    Args:
+        filtro: Criterios a aplicar, o None para no acotar nada.
+        alias: Alias con el que la consulta nombra la tabla «producto».
+
+    Returns:
+        Par (condiciones, parámetros) listo para unir con ``AND``.
+    """
+    if filtro is None or filtro.vacio:
+        return [], []
+
+    condiciones: list[str] = []
+    parametros: list[object] = []
+    if filtro.idcategoria is not None:
+        condiciones.append(f"{alias}.idcategoria = ?")
+        parametros.append(filtro.idcategoria)
+    if filtro.idmarca is not None:
+        condiciones.append(f"{alias}.idmarca = ?")
+        parametros.append(filtro.idmarca)
+    return condiciones, parametros
+
+
+def agregar_condiciones(sql: str, condiciones: list[str]) -> str:
+    """
+    Añade a una consulta las condiciones acumuladas, si las hay.
+
+    Args:
+        sql: Consulta sin cláusula ``WHERE``.
+        condiciones: Condiciones a exigir todas a la vez.
+
+    Returns:
+        La consulta con su ``WHERE``, o tal cual si no había condiciones.
+    """
+    if not condiciones:
+        return sql
+    return sql + " WHERE " + " AND ".join(condiciones)
 
 
 class ProductoRepositorio(RepositorioBase[Producto]):
@@ -70,6 +118,7 @@ class ProductoRepositorio(RepositorioBase[Producto]):
         texto: str | None = None,
         limite: int | None = None,
         desplazamiento: int | None = None,
+        filtro: FiltroCatalogo | None = None,
     ) -> list[Producto]:
         """
         Lista productos con su categoría, marca y proveedor (RF08).
@@ -79,17 +128,18 @@ class ProductoRepositorio(RepositorioBase[Producto]):
             limite: Máximo de filas a traer; permite paginar catálogos
                 grandes sin degradar el rendimiento (RNF07).
             desplazamiento: Filas a saltar antes de empezar.
+            filtro: Acotación por marca y categoría; se combina con el texto.
 
         Returns:
             Productos ordenados por descripción.
         """
-        sql = CONSULTA_PRODUCTOS_CON_RELACIONES
-        parametros: list[object] = []
+        condiciones, parametros = condiciones_de_filtro(filtro)
 
         if texto and texto.strip():
-            sql += f" WHERE {obtener_motor().dialecto.comparar_texto('p.descripcion')}"
+            condiciones.append(obtener_motor().dialecto.comparar_texto("p.descripcion"))
             parametros.append(f"%{texto.strip()}%")
 
+        sql = agregar_condiciones(CONSULTA_PRODUCTOS_CON_RELACIONES, condiciones)
         sql += " ORDER BY p.descripcion"
         if limite is not None:
             sql += " LIMIT ?"
@@ -226,12 +276,15 @@ class HistorialPreciosRepositorio(RepositorioBase[CambioPrecio]):
             (idproducto, str(anterior), str(nuevo)),
         )
 
-    def listar_historial(self, idproducto: int | None = None) -> list[CambioPrecio]:
+    def listar_historial(
+        self, idproducto: int | None = None, filtro: FiltroCatalogo | None = None
+    ) -> list[CambioPrecio]:
         """
         Lista los cambios de precio, del más reciente al más antiguo (RF06).
 
         Args:
             idproducto: Si se indica, limita el historial a ese producto.
+            filtro: Acotación por marca y categoría del producto.
 
         Returns:
             Cambios de precio con el nombre del producto incluido.
@@ -242,10 +295,12 @@ class HistorialPreciosRepositorio(RepositorioBase[CambioPrecio]):
             FROM historialprecios h
             JOIN producto p ON h.idproducto = p.idproducto
         """
-        parametros: tuple = ()
+        condiciones, parametros = condiciones_de_filtro(filtro)
         if idproducto is not None:
-            sql += " WHERE h.idproducto = ?"
-            parametros = (idproducto,)
+            condiciones.append("h.idproducto = ?")
+            parametros.append(idproducto)
+
+        sql = agregar_condiciones(sql, condiciones)
         sql += " ORDER BY h.fechacambio DESC, h.idhistorial DESC"
 
         return [self._a_entidad(fila) for fila in self.consultar(sql, parametros)]

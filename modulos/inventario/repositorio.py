@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from modulos.inventario.modelos import Movimiento
+from modulos.productos.modelos import FiltroCatalogo
+from modulos.productos.repositorio import agregar_condiciones, condiciones_de_filtro
 from nucleo.base_datos import obtener_motor
 from nucleo.repositorio import RepositorioBase
 
@@ -52,12 +54,15 @@ class InventarioRepositorio(RepositorioBase[Movimiento]):
             (idproducto, tipo, cantidad),
         )
 
-    def listar_historial(self, idproducto: int | None = None) -> list[Movimiento]:
+    def listar_historial(
+        self, idproducto: int | None = None, filtro: FiltroCatalogo | None = None
+    ) -> list[Movimiento]:
         """
         Lista los movimientos, del más reciente al más antiguo (RF05).
 
         Args:
             idproducto: Si se indica, limita el historial a ese producto.
+            filtro: Acotación por marca y categoría del producto.
 
         Returns:
             Movimientos con el nombre del producto incluido.
@@ -68,10 +73,12 @@ class InventarioRepositorio(RepositorioBase[Movimiento]):
             FROM inventario i
             JOIN producto p ON i.idproducto = p.idproducto
         """
-        parametros: tuple = ()
+        condiciones, parametros = condiciones_de_filtro(filtro)
         if idproducto is not None:
-            sql += " WHERE i.idproducto = ?"
-            parametros = (idproducto,)
+            condiciones.append("i.idproducto = ?")
+            parametros.append(idproducto)
+
+        sql = agregar_condiciones(sql, condiciones)
         sql += " ORDER BY i.fechamovimiento DESC, i.idinventario DESC"
 
         return [self._a_entidad(fila) for fila in self.consultar(sql, parametros)]

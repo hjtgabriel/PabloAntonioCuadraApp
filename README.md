@@ -118,6 +118,22 @@ cerca, verde si hay de sobra.
 Un producto que ya se vendió no puede eliminarse, porque los reportes
 históricos dejarían de cuadrar.
 
+### 2.3.1. Filtrar por marca y categoría
+
+En **Productos**, **Inventario**, **Historial de precios** e **Historial de
+inventario** hay dos listas desplegables junto a la búsqueda: **Categoría** y
+**Marca**.
+
+- Los dos criterios se **suman**: elegir «Articulos escolares» y la marca
+  «Pointer» deja solo los productos que cumplen ambas cosas.
+- El filtro también se suma a lo que escriba en la búsqueda, en vez de
+  reemplazarlo.
+- Cuando hay algún filtro puesto aparece el botón **⊘** para quitarlos de una
+  vez y volver a verlo todo.
+
+En los dos historiales el filtro se aplica sobre los datos del producto al que
+pertenece cada movimiento o cada cambio de precio.
+
 ### 2.4. Mover inventario
 
 1. Abra **Inventario** y pulse una fila del catálogo.
@@ -329,6 +345,7 @@ vistas/                  Interfaz
     dialogos.py          Formularios y confirmaciones
     tablas.py            Tabla con paginación y acciones
     registros.py         Lectura de registros y precarga de formularios
+    filtros.py           Filtro por marca y categoría (RF08)
   crud.py                Pantalla de mantenimiento genérica
   dashboard.py           Panel principal y menú por rol (RF02)
   *.py                   Una pantalla por sección

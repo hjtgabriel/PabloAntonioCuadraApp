@@ -34,6 +34,7 @@ from tema import (
 )
 from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.campos import campo_entero, campo_seleccion
+from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.layout import encabezado, tarjeta
 from vistas.componentes.notificaciones import avisar_error, avisar_exito
 from vistas.componentes.tablas import Columna, TablaDatos
@@ -82,6 +83,7 @@ class PantallaInventario:
         )
 
         self._busqueda = BarraBusqueda(self._buscar, marcador="Buscar producto…")
+        self._filtros = BarraFiltros(self._recargar_catalogo)
         self._titulo_producto = ft.Text(size=TEXTO_SUBTITULO, weight=ft.FontWeight.BOLD, color=TEXTO)
         self._detalle_stock = ft.Text(size=14, color=TEXTO)
         self._tipo = campo_seleccion(
@@ -103,7 +105,9 @@ class PantallaInventario:
         self._buscar("")
         return ft.Column(
             [
-                encabezado("Inventario · Movimientos de stock", self._busqueda),
+                encabezado(
+                    "Inventario · Movimientos de stock", self._filtros, self._busqueda
+                ),
                 ft.Row(
                     [
                         ft.Container(
@@ -163,15 +167,21 @@ class PantallaInventario:
 
     # ── Acciones ────────────────────────────────────────────────
 
+    def _recargar_catalogo(self) -> None:
+        """Vuelve a cargar el catálogo respetando lo que haya escrito el usuario."""
+        self._buscar(self._busqueda.texto)
+
     def _buscar(self, texto: str) -> None:
         """
-        Carga el catálogo aplicando el filtro de búsqueda (RF08).
+        Carga el catálogo aplicando la búsqueda y los filtros (RF08).
 
         Args:
             texto: Término de búsqueda; vacío para listar todo.
         """
         try:
-            self._tabla_productos.cargar(self._productos.listar(texto))
+            self._tabla_productos.cargar(
+                self._productos.listar(texto, filtro=self._filtros.filtro)
+            )
         except ErrorAplicacion as error:
             avisar_error(self._pagina, str(error))
 

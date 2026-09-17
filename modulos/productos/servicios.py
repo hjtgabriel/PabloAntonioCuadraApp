@@ -14,7 +14,12 @@ from decimal import Decimal, InvalidOperation
 
 from modulos.inventario.modelos import TipoMovimiento
 from modulos.inventario.servicios import ServicioInventario
-from modulos.productos.modelos import STOCK_MINIMO_POR_OMISION, CambioPrecio, Producto
+from modulos.productos.modelos import (
+    STOCK_MINIMO_POR_OMISION,
+    CambioPrecio,
+    FiltroCatalogo,
+    Producto,
+)
 from modulos.productos.repositorio import HistorialPreciosRepositorio, ProductoRepositorio
 from nucleo.base_datos import Conexion, transaccion
 from nucleo.errores import ErrorEnUso, ErrorNoEncontrado, ErrorValidacion
@@ -49,6 +54,7 @@ class ServicioProductos:
         texto: str | None = None,
         limite: int | None = None,
         desplazamiento: int | None = None,
+        filtro: FiltroCatalogo | None = None,
     ) -> list[Producto]:
         """
         Lista productos con su categoría, marca y proveedor (RF08).
@@ -57,11 +63,13 @@ class ServicioProductos:
             texto: Término de búsqueda parcial sobre la descripción.
             limite: Máximo de filas, para paginar catálogos grandes (RNF07).
             desplazamiento: Filas a saltar antes de empezar.
+            filtro: Acotación por marca y categoría; se suma a la búsqueda por
+                texto en vez de sustituirla.
 
         Returns:
             Productos ordenados por descripción.
         """
-        return self._repositorio.buscar(texto, limite, desplazamiento)
+        return self._repositorio.buscar(texto, limite, desplazamiento, filtro)
 
     def obtener(self, idproducto: int) -> Producto:
         """
@@ -81,17 +89,20 @@ class ServicioProductos:
             raise ErrorNoEncontrado("No se encontró el producto solicitado")
         return producto
 
-    def listar_historial_precios(self, idproducto: int | None = None) -> list[CambioPrecio]:
+    def listar_historial_precios(
+        self, idproducto: int | None = None, filtro: FiltroCatalogo | None = None
+    ) -> list[CambioPrecio]:
         """
         Devuelve la evolución de precios registrada (RF06).
 
         Args:
             idproducto: Si se indica, limita el historial a ese producto.
+            filtro: Acotación por marca y categoría del producto.
 
         Returns:
             Cambios de precio del más reciente al más antiguo.
         """
-        return self._historial.listar_historial(idproducto)
+        return self._historial.listar_historial(idproducto, filtro)
 
     # ── Escrituras ──────────────────────────────────────────────
 

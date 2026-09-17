@@ -24,6 +24,7 @@ from vistas.componentes.campos import (
     longitud_minima,
 )
 from vistas.componentes.dialogos import Campo, definir_campo
+from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.registros import lector
 from vistas.componentes.tablas import Columna
 from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
@@ -118,6 +119,7 @@ def pantalla_productos(pagina: ft.Page) -> ft.Control:
         El control raíz de la pantalla.
     """
     servicio = ServicioProductos()
+    filtros = BarraFiltros()
 
     return construir_pantalla_crud(
         pagina,
@@ -136,12 +138,13 @@ def pantalla_productos(pagina: ft.Page) -> ft.Control:
                 Columna("stockminimo", "Mínimo", numerica=True),
             ],
             construir_campos=_construir_campos,
-            listar=servicio.listar,
+            listar=lambda texto: servicio.listar(texto, filtro=filtros.filtro),
+            filtros=filtros,
             crear=servicio.crear,
             actualizar=servicio.actualizar,
             eliminar=servicio.eliminar,
             marcador_busqueda="Buscar producto…",
-            mensaje_vacio="Aún no hay productos en el catálogo",
+            mensaje_vacio="Ningún producto coincide con la búsqueda o los filtros",
             texto_confirmar_borrado=(
                 "¿Desea eliminar este producto? Solo es posible si nunca se ha vendido."
             ),

@@ -34,17 +34,30 @@ def encabezado(titulo: str, *acciones: ft.Control) -> ft.Container:
         titulo: Título de la pantalla.
         *acciones: Controles a alinear a la derecha (búsqueda, botones…).
 
+    Las acciones se ajustan a una segunda línea cuando no caben junto al
+    título. Antes se alineaban con un separador expansible, de modo que al
+    sumar controles —el filtro por marca y categoría junto a la búsqueda— los
+    últimos quedaban cortados por el borde de la ventana en vez de bajar.
+
     Returns:
         Contenedor con el encabezado y su línea divisoria.
     """
     fila = ft.Row(
         [
             ft.Text(titulo, size=TEXTO_TITULO, weight=ft.FontWeight.BOLD, color=TEXTO),
-            ft.Container(expand=True),
-            *acciones,
+            ft.Row(
+                list(acciones),
+                spacing=ESPACIO,
+                wrap=True,
+                run_spacing=ESPACIO,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
         ],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
         spacing=ESPACIO,
+        wrap=True,
+        run_spacing=ESPACIO,
     )
     return ft.Container(
         content=ft.Column([fila, ft.Divider(height=1, color=BORDE)], spacing=ESPACIO),

@@ -17,11 +17,12 @@ import flet as ft
 
 from modulos.inventario.modelos import Movimiento
 from modulos.inventario.servicios import ServicioInventario
-from modulos.productos.modelos import CambioPrecio
+from modulos.productos.modelos import CambioPrecio, FiltroCatalogo
 from modulos.productos.servicios import ServicioProductos
 from nucleo.errores import ErrorAplicacion
 from tema import ACENTO, AVISO, ERROR, EXITO, TEXTO
 from vistas.componentes.campos import campo_seleccion
+from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.layout import pantalla
 from vistas.componentes.notificaciones import avisar_error
 from vistas.componentes.tablas import Columna, TablaDatos
@@ -41,7 +42,7 @@ class PantallaHistorial:
         *,
         titulo: str,
         columnas: list[Columna],
-        cargar: Callable[[int | None], list[Any]],
+        cargar: Callable[[int | None, FiltroCatalogo], list[Any]],
         mensaje_vacio: str,
     ) -> None:
         """
@@ -50,7 +51,8 @@ class PantallaHistorial:
             titulo: Encabezado de la pantalla.
             columnas: Columnas de la tabla.
             cargar: Función que devuelve las filas; recibe el producto elegido
-                o None para traer el historial completo.
+                (o None para traerlos todos) y la acotación por marca y
+                categoría.
             mensaje_vacio: Qué mostrar cuando no hay registros.
         """
         self._pagina = pagina
@@ -64,6 +66,7 @@ class PantallaHistorial:
             valor=TODOS,
             al_seleccionar=lambda _evento: self._refrescar(),
         )
+        self._filtros_catalogo = BarraFiltros(self._refrescar)
 
     def construir(self) -> ft.Control:
         """
@@ -76,6 +79,7 @@ class PantallaHistorial:
         return pantalla(
             self._titulo,
             self._tabla,
+            self._filtros_catalogo,
             self._filtro,
             ft.IconButton(
                 icon=ft.Icons.REFRESH,
@@ -88,7 +92,9 @@ class PantallaHistorial:
     def _refrescar(self) -> None:
         """Vuelve a consultar el historial respetando el filtro elegido."""
         try:
-            self._tabla.cargar(self._cargar(self._producto_elegido()))
+            self._tabla.cargar(
+                self._cargar(self._producto_elegido(), self._filtros_catalogo.filtro)
+            )
         except ErrorAplicacion as error:
             avisar_error(self._pagina, str(error))
 
@@ -138,7 +144,9 @@ def pantalla_historial_precios(pagina: ft.Page) -> ft.Control:
             Columna("precionuevo", "Precio nuevo", formato=_moneda, numerica=True),
             Columna("variacion", "Variación", formato=_variacion, color=_color_variacion, numerica=True),
         ],
-        cargar=lambda idproducto: ServicioProductos().listar_historial_precios(idproducto),
+        cargar=lambda idproducto, filtro: ServicioProductos().listar_historial_precios(
+            idproducto, filtro
+        ),
         mensaje_vacio="Todavía no se ha registrado ningún cambio de precio",
     ).construir()
 
@@ -162,7 +170,9 @@ def pantalla_historial_inventario(pagina: ft.Page) -> ft.Control:
             Columna("tipomovimiento", "Tipo", color=_color_movimiento),
             Columna("cantidad", "Cantidad", numerica=True),
         ],
-        cargar=lambda idproducto: ServicioInventario().listar_historial(idproducto),
+        cargar=lambda idproducto, filtro: ServicioInventario().listar_historial(
+            idproducto, filtro
+        ),
         mensaje_vacio="Todavía no se ha registrado ningún movimiento",
     ).construir()
 
