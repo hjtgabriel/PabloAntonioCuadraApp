@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from modulos.ventas.modelos import DetalleVenta, Venta
 from nucleo.base_datos import obtener_motor
-from nucleo.repositorio import RepositorioBase
+from nucleo.repositorio import RepositorioBase, a_fecha
 
 CONSULTA_VENTAS = """
     SELECT v.idventa, v.idusuario, u.nombreusuario, v.fechaventa,
@@ -34,7 +34,7 @@ class VentaRepositorio(RepositorioBase[Venta]):
         return Venta(
             idventa=fila["idventa"],
             idusuario=fila["idusuario"],
-            fechaventa=fila["fechaventa"],
+            fechaventa=a_fecha(fila["fechaventa"]),
             totalventa=_a_decimal(fila["totalventa"]),
             efectivorecibido=_a_decimal(fila["efectivorecibido"]),
             cambioentregado=_a_decimal(fila["cambioentregado"]),

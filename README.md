@@ -102,6 +102,23 @@ cual.
 - *«El efectivo recibido es menor que el total»*: revise el monto escrito.
 - *«El carrito está vacío»*: agregue al menos un producto antes de cobrar.
 
+### 2.2.1. La factura
+
+Al cobrar aparece la factura de la venta, con cada artículo, su precio y su
+subtotal, además del total, el efectivo recibido y el cambio.
+
+El botón **Imprimir factura** guarda el documento en la carpeta `facturas/` y
+lo abre en el navegador, donde se imprime con **Ctrl+P**. Desde esa misma
+ventana se puede elegir «Guardar como PDF» en lugar de una impresora.
+
+Cada factura queda guardada con su número y su fecha (por ejemplo
+`factura_00042_20260917_150430.html`), así que puede volver a abrirse e
+imprimirse más tarde sin pasar por el sistema.
+
+> Flet no incluye impresión propia, por eso la factura sale por el navegador.
+> Es también lo que permite imprimir desde cualquier equipo sin instalar nada
+> más.
+
 ### 2.3. Administrar productos
 
 En **Productos** puede buscar, agregar, editar y eliminar artículos.
@@ -327,6 +344,7 @@ nucleo/                  Infraestructura compartida
   repositorio.py         Repositorios base y de catálogo
   servicio.py            Servicio genérico de catálogos
   registro.py            Registro de eventos
+  documentos.py          Guardado y apertura de documentos
   respaldo.py            Estrategia 3-2-1 (RNF05)
 
 modulos/                 Lógica de negocio, un módulo por capacidad
@@ -336,7 +354,7 @@ modulos/                 Lógica de negocio, un módulo por capacidad
   proveedores/
   productos/             Catálogo e historial de precios
   inventario/            Movimientos de stock
-  ventas/                Punto de venta
+  ventas/                Punto de venta y factura imprimible (RF11)
   reportes/
 
 vistas/                  Interfaz

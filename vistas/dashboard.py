@@ -64,33 +64,10 @@ SECCIONES: tuple[Seccion, ...] = (
         ft.Icons.POINT_OF_SALE,
         lambda pagina, sesion: pantalla_ventas(pagina, sesion.idusuario),
     ),
-    Seccion("Productos", ft.Icons.INVENTORY_2, lambda pagina, _sesion: pantalla_productos(pagina)),
-    Seccion("Inventario", ft.Icons.SWAP_HORIZ, lambda pagina, _sesion: pantalla_inventario(pagina)),
-    Seccion("Categorías", ft.Icons.CATEGORY, lambda pagina, _sesion: pantalla_categorias(pagina)),
-    Seccion("Marcas", ft.Icons.LABEL, lambda pagina, _sesion: pantalla_marcas(pagina)),
     Seccion(
-        "Proveedores", ft.Icons.LOCAL_SHIPPING, lambda pagina, _sesion: pantalla_proveedores(pagina)
-    ),
-    Seccion(
-        "Historial de precios",
-        ft.Icons.PRICE_CHANGE,
-        lambda pagina, _sesion: pantalla_historial_precios(pagina),
-    ),
-    Seccion(
-        "Historial de inventario",
-        ft.Icons.HISTORY,
-        lambda pagina, _sesion: pantalla_historial_inventario(pagina),
-    ),
-    Seccion(
-        "Reportes",
-        ft.Icons.BAR_CHART,
-        lambda pagina, _sesion: pantalla_reportes(pagina),
-        solo_administrador=True,
-    ),
-    Seccion(
-        "Usuarios",
-        ft.Icons.PEOPLE,
-        lambda pagina, _sesion: pantalla_usuarios(pagina),
+        "Roles",
+        ft.Icons.ADMIN_PANEL_SETTINGS,
+        lambda pagina, _sesion: pantalla_roles(pagina),
         solo_administrador=True,
     ),
     Seccion(
@@ -100,10 +77,27 @@ SECCIONES: tuple[Seccion, ...] = (
         solo_administrador=True,
     ),
     Seccion(
-        "Roles",
-        ft.Icons.ADMIN_PANEL_SETTINGS,
-        lambda pagina, _sesion: pantalla_roles(pagina),
+        "Usuarios",
+        ft.Icons.PEOPLE,
+        lambda pagina, _sesion: pantalla_usuarios(pagina),
         solo_administrador=True,
+    ),
+    Seccion(
+        "Proveedores", ft.Icons.LOCAL_SHIPPING, lambda pagina, _sesion: pantalla_proveedores(pagina)
+    ),
+    Seccion("Inventario", ft.Icons.SWAP_HORIZ, lambda pagina, _sesion: pantalla_inventario(pagina)),
+    Seccion(
+        "Historial de inventario",
+        ft.Icons.HISTORY,
+        lambda pagina, _sesion: pantalla_historial_inventario(pagina),
+    ),
+    Seccion("Categorías", ft.Icons.CATEGORY, lambda pagina, _sesion: pantalla_categorias(pagina)),
+    Seccion("Marcas", ft.Icons.LABEL, lambda pagina, _sesion: pantalla_marcas(pagina)),
+    Seccion("Productos", ft.Icons.INVENTORY_2, lambda pagina, _sesion: pantalla_productos(pagina)),
+    Seccion(
+        "Historial de precios",
+        ft.Icons.PRICE_CHANGE,
+        lambda pagina, _sesion: pantalla_historial_precios(pagina),
     ),
     Seccion(
         "Respaldos",
@@ -111,7 +105,21 @@ SECCIONES: tuple[Seccion, ...] = (
         lambda pagina, _sesion: pantalla_respaldos(pagina),
         solo_administrador=True,
     ),
+    Seccion(
+        "Reportes",
+        ft.Icons.BAR_CHART,
+        lambda pagina, _sesion: pantalla_reportes(pagina),
+        solo_administrador=True,
+    ),
 )
+"""
+Entradas del menú lateral, en el orden en que aparecen.
+
+El orden lo fija el uso del local, no la afinidad técnica de los módulos. Por
+eso «Proveedores» va antes de «Inventario» y «Reportes» al final: es la
+secuencia que pidió quien administra la librería. «Cerrar sesión» no está aquí
+porque el menú la añade siempre como última entrada.
+"""
 
 
 class PanelPrincipal:

@@ -243,3 +243,45 @@ def test_ocultar_el_menu_no_cierra_la_seccion_abierta(producto_demo, pagina):
     panel._alternar_menu(None)
 
     assert panel._contenido.content is antes
+
+
+# ── Orden del menú ──────────────────────────────────────────────────────
+
+ORDEN_PEDIDO = [
+    "Punto de venta",
+    "Roles",
+    "Empleados",
+    "Usuarios",
+    "Proveedores",
+    "Inventario",
+    "Historial de inventario",
+    "Categorías",
+    "Marcas",
+    "Productos",
+    "Historial de precios",
+    "Respaldos",
+    "Reportes",
+]
+
+
+def test_el_menu_sigue_el_orden_acordado():
+    """
+    El orden del menú es un acuerdo con quien administra la librería.
+
+    Responde al uso diario del local, no a la afinidad técnica de los módulos,
+    así que no puede cambiar sin querer al agregar una sección nueva.
+    """
+    assert [seccion.etiqueta for seccion in SECCIONES] == ORDEN_PEDIDO
+
+
+def test_el_punto_de_venta_abre_primero():
+    """Es la pantalla donde se pasa la jornada, así que abre al entrar."""
+    assert SECCIONES[0].etiqueta == "Punto de venta"
+    assert SECCIONES[0].solo_administrador is False
+
+
+def test_el_vendedor_conserva_el_orden_relativo(producto_demo, pagina):
+    """Quitar las secciones de administración no debe barajar las que quedan."""
+    visibles = etiquetas_visibles("Vendedor")
+
+    assert visibles == [e for e in ORDEN_PEDIDO if e in visibles]

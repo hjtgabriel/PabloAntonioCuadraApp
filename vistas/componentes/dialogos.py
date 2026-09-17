@@ -299,12 +299,22 @@ class DialogoConfirmacion(DialogoBase):
 class DialogoInformacion(DialogoBase):
     """Diálogo de solo lectura, para mostrar un comprobante o un detalle."""
 
-    def __init__(self, pagina: ft.Page, titulo: str, contenido: ft.Control) -> None:
+    def __init__(
+        self,
+        pagina: ft.Page,
+        titulo: str,
+        contenido: ft.Control,
+        *,
+        acciones: list[ft.Control] | None = None,
+    ) -> None:
         """
         Args:
             pagina: Página sobre la que se muestra el diálogo.
             titulo: Encabezado del diálogo.
             contenido: Control con la información a mostrar.
+            acciones: Botones propios a ofrecer antes de «Aceptar», como el de
+                imprimir una factura. «Aceptar» va siempre el último para que
+                cerrar esté donde el usuario ya lo espera.
         """
         self._recordar_pagina(pagina)
         super().__init__(
@@ -312,6 +322,7 @@ class DialogoInformacion(DialogoBase):
             title=ft.Text(titulo, color=TEXTO, weight=ft.FontWeight.BOLD),
             content=contenido,
             actions=[
+                *(acciones or []),
                 ft.Button(
                     "Aceptar",
                     icon=ft.Icons.CHECK,
@@ -319,7 +330,7 @@ class DialogoInformacion(DialogoBase):
                     bgcolor=ACENTO,
                     color=SUPERFICIE,
                     style=estilo_boton(),
-                )
+                ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )

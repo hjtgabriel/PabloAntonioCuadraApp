@@ -20,6 +20,9 @@ respaldos/
 *.dump
 *.sql.gz
 
+# Facturas generadas (RF11): son documentos del local, no del código
+facturas/
+
 # Registro de eventos de la aplicación
 logs/
 *.log

@@ -47,6 +47,10 @@ class Configuracion(BaseSettings):
     pg_bin: str = Field(default="", alias="PG_BIN")
     """Carpeta «bin» de PostgreSQL; solo hace falta si «pg_dump» no está en el PATH."""
 
+    # ── Facturas (RF11) ─────────────────────────────────────────
+    facturas_dir: str = Field(default="facturas", alias="FACTURAS_DIR")
+    """Carpeta donde se guardan las facturas para poder reimprimirlas."""
+
     # ── Respaldos 3-2-1 (RNF05) ─────────────────────────────────
     respaldo_dir_primario: str = Field(default="respaldos/local", alias="RESPALDO_DIR_PRIMARIO")
     respaldo_dir_secundario: str = Field(default="respaldos/externo", alias="RESPALDO_DIR_SECUNDARIO")
@@ -97,6 +101,17 @@ class Configuracion(BaseSettings):
     def usa_sqlite(self) -> bool:
         """True si el motor configurado es SQLite."""
         return self.db_motor == "sqlite"
+
+    @property
+    def carpeta_facturas(self) -> Path:
+        """
+        Carpeta donde guardar las facturas, resuelta desde la raíz del proyecto.
+
+        Una ruta relativa se interpreta dentro del proyecto para que la
+        aplicación funcione igual desde cualquier directorio de trabajo.
+        """
+        carpeta = Path(self.facturas_dir)
+        return carpeta if carpeta.is_absolute() else RAIZ_PROYECTO / carpeta
 
     @property
     def ruta_sqlite(self) -> Path:

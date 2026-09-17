@@ -11,14 +11,18 @@ flotante y podía desviarse en el vuelto.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal, InvalidOperation
 
 import flet as ft
 
+from config import obtener_configuracion
 from modulos.productos.modelos import Producto
 from modulos.productos.servicios import ServicioProductos
-from modulos.ventas.modelos import CENTAVO, ComprobanteVenta, LineaCarrito
+from modulos.ventas.factura import componer_html, nombre_archivo
+from modulos.ventas.modelos import CENTAVO, DetalleVenta, LineaCarrito, Venta
 from modulos.ventas.servicios import ServicioVentas
+from nucleo.documentos import abrir, guardar
 from nucleo.errores import ErrorAplicacion
 from tema import (
     ACENTO,
@@ -364,8 +368,49 @@ class PuntoDeVenta:
             return
 
         avisar_exito(self._pagina, f"Venta {comprobante.idventa} registrada")
-        self._pagina.show_dialog(_comprobante(self._pagina, comprobante))
+        self._mostrar_factura(comprobante.idventa)
         self._vaciar()
+
+    def _mostrar_factura(self, idventa: int) -> None:
+        """
+        Abre la factura de la venta recién cobrada (RF11).
+
+        Si no se puede recuperar el detalle, se avisa sin alarmar: la venta ya
+        quedó registrada y la factura se puede reimprimir desde el historial.
+
+        Args:
+            idventa: Clave de la venta a facturar.
+        """
+        try:
+            venta = self._ventas.obtener_detalle(idventa)
+        except ErrorAplicacion as error:
+            avisar_error(self._pagina, f"La venta se registró, pero no se pudo abrir la factura: {error}")
+            return
+
+        self._pagina.show_dialog(_factura(self._pagina, venta, self._imprimir))
+
+    def _imprimir(self, venta: Venta) -> None:
+        """
+        Guarda la factura y la abre en el navegador para imprimirla (RF11).
+
+        Args:
+            venta: Venta a facturar, con sus líneas.
+        """
+        configuracion = obtener_configuracion()
+        try:
+            ruta = guardar(
+                componer_html(venta, configuracion.nombre_app),
+                configuracion.carpeta_facturas,
+                nombre_archivo(venta),
+            )
+        except ErrorAplicacion as error:
+            avisar_error(self._pagina, str(error))
+            return
+
+        if abrir(ruta):
+            avisar_exito(self._pagina, "Factura abierta en el navegador; imprima con Ctrl+P")
+        else:
+            avisar_advertencia(self._pagina, f"La factura quedó guardada en {ruta}")
 
     def _vaciar(self) -> None:
         """Deja la pantalla lista para la siguiente venta."""
@@ -427,40 +472,109 @@ def pantalla_ventas(pagina: ft.Page, idusuario: int) -> ft.Control:
     return PuntoDeVenta(pagina, idusuario).construir()
 
 
-def _comprobante(pagina: ft.Page, venta: ComprobanteVenta) -> ft.AlertDialog:
+def _factura(
+    pagina: ft.Page, venta: Venta, al_imprimir: Callable[[Venta], None]
+) -> ft.AlertDialog:
     """
-    Arma el diálogo con el comprobante de la venta.
+    Arma el diálogo con la factura de la venta (RF11).
+
+    Muestra el detalle completo —cada artículo con su cantidad, precio y
+    subtotal— y no solo los totales, porque es lo que el cliente pide revisar
+    antes de llevarse el comprobante.
 
     Args:
-        pagina: Página sobre la que se muestra el comprobante.
-        venta: Datos de la venta recién registrada.
+        pagina: Página sobre la que se muestra la factura.
+        venta: Venta registrada, con sus líneas.
+        al_imprimir: Función que guarda y abre la factura para imprimirla.
 
     Returns:
         El diálogo listo para mostrar.
     """
-    filas = [
-        ("Venta N.º", str(venta.idventa)),
-        ("Total", f"{MONEDA} {venta.total:,.2f}"),
-        ("Efectivo recibido", f"{MONEDA} {venta.efectivo:,.2f}"),
-        ("Cambio a entregar", f"{MONEDA} {venta.cambio:,.2f}"),
-    ]
     contenido = ft.Column(
         [
-            ft.Row(
-                [
-                    ft.Text(etiqueta, color=TEXTO),
-                    ft.Container(expand=True),
-                    ft.Text(
-                        valor,
-                        color=EXITO if etiqueta.startswith("Cambio") else TEXTO,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                ]
-            )
-            for etiqueta, valor in filas
+            ft.Text(
+                f"Factura N.º {venta.idventa:05d}  ·  {venta.fechaventa:%d/%m/%Y %H:%M}",
+                size=12,
+                color=TEXTO,
+            ),
+            ft.Divider(height=1),
+            *[_linea_factura(detalle) for detalle in venta.detalles],
+            ft.Divider(height=1),
+            *[
+                _total_factura(etiqueta, importe, destacado)
+                for etiqueta, importe, destacado in (
+                    ("Total", venta.totalventa, True),
+                    ("Efectivo recibido", venta.efectivorecibido, False),
+                    ("Cambio entregado", venta.cambioentregado, False),
+                )
+            ],
         ],
         tight=True,
         spacing=ESPACIO,
-        width=320,
+        width=380,
+        scroll=ft.ScrollMode.AUTO,
     )
-    return DialogoInformacion(pagina, "Venta registrada", contenido)
+
+    return DialogoInformacion(
+        pagina,
+        "Venta registrada",
+        contenido,
+        acciones=[
+            ft.TextButton(
+                "Imprimir factura",
+                icon=ft.Icons.PRINT,
+                on_click=lambda _evento: al_imprimir(venta),
+                style=ft.ButtonStyle(color=ACENTO),
+            )
+        ],
+    )
+
+
+def _linea_factura(detalle: DetalleVenta) -> ft.Row:
+    """
+    Arma una línea de artículo de la factura.
+
+    Args:
+        detalle: Línea de la venta.
+
+    Returns:
+        La fila con cantidad, descripción y subtotal.
+    """
+    return ft.Row(
+        [
+            ft.Text(f"{detalle.cantidad} ×", color=TEXTO, width=36),
+            ft.Text(detalle.descripcion or "—", color=TEXTO, expand=True, size=13),
+            ft.Text(
+                f"{MONEDA} {Decimal(str(detalle.subtotal or 0)):,.2f}",
+                color=TEXTO,
+                weight=ft.FontWeight.W_500,
+            ),
+        ],
+        spacing=8,
+    )
+
+
+def _total_factura(etiqueta: str, importe: Decimal, destacado: bool) -> ft.Row:
+    """
+    Arma una de las filas de totales de la factura.
+
+    Args:
+        etiqueta: Rótulo de la fila.
+        importe: Importe a mostrar.
+        destacado: Si es el total, que se resalta.
+
+    Returns:
+        La fila del total.
+    """
+    return ft.Row(
+        [
+            ft.Text(etiqueta, color=TEXTO, weight=ft.FontWeight.BOLD if destacado else None),
+            ft.Container(expand=True),
+            ft.Text(
+                f"{MONEDA} {importe:,.2f}",
+                color=EXITO if etiqueta.startswith("Cambio") else TEXTO,
+                weight=ft.FontWeight.BOLD,
+                size=16 if destacado else 14,
+            ),
+        ]
+    )

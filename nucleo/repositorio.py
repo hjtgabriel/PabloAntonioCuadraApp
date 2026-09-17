@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 from nucleo.base_datos import Conexion, obtener_motor, transaccion
@@ -376,3 +377,31 @@ class RepositorioCatalogo(RepositorioBase[dict]):
             condicion += f" AND {self.clave} <> ?"
             parametros.append(excluir_id)
         return self.contar(condicion, parametros) > 0
+
+
+def a_fecha(valor: object) -> datetime:
+    """
+    Convierte a ``datetime`` una marca de tiempo leída de la base de datos.
+
+    Los drivers no coinciden: psycopg2 devuelve ya un ``datetime`` y SQLite
+    entrega el texto tal cual lo guardó. Sin esta conversión, una entidad que
+    declara ``fechaventa: datetime`` a veces contiene una cadena, y quien
+    confíe en el tipo declarado —por ejemplo para dar formato a una factura—
+    falla solo en uno de los dos motores.
+
+    Args:
+        valor: Fecha tal como la devolvió el driver.
+
+    Returns:
+        La fecha como ``datetime``; el momento actual si no se pudo
+        interpretar, para no dejar un registro sin fecha.
+    """
+    if isinstance(valor, datetime):
+        return valor
+    if valor is None:
+        return datetime.now()
+    try:
+        return datetime.fromisoformat(str(valor))
+    except ValueError:
+        logger.warning("Fecha no interpretable en la base de datos: %r", valor)
+        return datetime.now()
