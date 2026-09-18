@@ -43,6 +43,11 @@ class ServicioInventario:
         Las dos escrituras ocurren en la misma transacción: si el asiento falla,
         el stock vuelve atrás, y viceversa.
 
+        Cuando el movimiento resta, el descuento y su comprobación van en una
+        sola sentencia. Comprobar antes en Python y escribir después dejaba una
+        ventana por la que dos ventas simultáneas de la última unidad pasaban
+        las dos.
+
         Args:
             idproducto: Producto a mover.
             tipo: «Entrada», «Salida», «Venta» o «Ajuste». En un ajuste, la
@@ -70,13 +75,15 @@ class ServicioInventario:
 
             delta = self._calcular_delta(movimiento, cantidad_valida, actual)
             stock_final = actual.stock + delta
-            if stock_final < 0:
-                raise ErrorStockInsuficiente(
-                    f"No hay existencias suficientes de «{actual.descripcion}»: "
-                    f"hay {actual.stock} y se intentan retirar {abs(delta)}"
-                )
 
-            productos.ajustar_stock(idproducto, delta)
+            if delta < 0:
+                if not productos.descontar_stock(idproducto, -delta):
+                    raise ErrorStockInsuficiente(
+                        f"No hay existencias suficientes de «{actual.descripcion}»: "
+                        f"hay {actual.stock} y se intentan retirar {abs(delta)}"
+                    )
+            elif delta > 0:
+                productos.ajustar_stock(idproducto, delta)
             inventario.anotar(idproducto, movimiento.value, cantidad_valida)
 
             logger.info(

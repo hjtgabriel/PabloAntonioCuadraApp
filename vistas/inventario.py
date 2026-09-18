@@ -18,6 +18,7 @@ from modulos.inventario.servicios import ServicioInventario
 from modulos.productos.modelos import Producto
 from modulos.productos.servicios import ServicioProductos
 from nucleo.errores import ErrorAplicacion
+from nucleo.formato import fecha
 from tema import (
     ACENTO,
     AVISO,
@@ -36,7 +37,11 @@ from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.campos import campo_entero, campo_seleccion
 from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.layout import encabezado, tarjeta
-from vistas.componentes.notificaciones import avisar_error, avisar_exito
+from vistas.componentes.notificaciones import (
+    avisar_error,
+    avisar_exito,
+    avisar_fallo_inesperado,
+)
 from vistas.componentes.tablas import Columna, TablaDatos
 
 COLORES_MOVIMIENTO = {
@@ -74,7 +79,7 @@ class PantallaInventario:
         )
         self._tabla_movimientos = TablaDatos(
             [
-                Columna("fechamovimiento", "Fecha", formato=_formato_fecha),
+                Columna("fechamovimiento", "Fecha", formato=fecha),
                 Columna("tipomovimiento", "Tipo", color=_color_movimiento),
                 Columna("cantidad", "Cantidad", numerica=True),
             ],
@@ -226,7 +231,7 @@ class PantallaInventario:
             avisar_error(self._pagina, str(error))
             return
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            avisar_error(self._pagina, f"Ocurrió un problema inesperado: {error}")
+            avisar_fallo_inesperado(self._pagina, "registrar el movimiento", error)
             return
 
         avisar_exito(self._pagina, f"Movimiento registrado. Stock actual: {stock_final}")
@@ -286,18 +291,3 @@ def _color_movimiento(movimiento: object) -> str:
     return COLORES_MOVIMIENTO.get(tipo, TEXTO)
 
 
-def _formato_fecha(valor: object) -> str:
-    """
-    Da formato legible a una marca de tiempo.
-
-    Args:
-        valor: Fecha tal como llegó de la base de datos.
-
-    Returns:
-        La fecha en formato «AAAA-MM-DD HH:MM».
-    """
-    if valor is None:
-        return "—"
-    if hasattr(valor, "strftime"):
-        return valor.strftime("%Y-%m-%d %H:%M")
-    return str(valor)[:16]

@@ -23,8 +23,9 @@ from nucleo.base_datos import MotorSQLite, cerrar_motor, configurar_motor  # noq
 
 ESQUEMA_PRUEBAS = """
 CREATE TABLE rol (
-    idrol     INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombrerol TEXT NOT NULL UNIQUE
+    idrol      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombrerol  TEXT NOT NULL UNIQUE,
+    administra INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE categoria (
     idcategoria INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,9 +92,10 @@ CREATE TABLE detalleventa (
     iddetalleventa INTEGER PRIMARY KEY AUTOINCREMENT,
     idventa        INTEGER NOT NULL REFERENCES venta(idventa),
     idproducto     INTEGER NOT NULL REFERENCES producto(idproducto),
-    cantidad       INTEGER NOT NULL
+    cantidad       INTEGER NOT NULL,
+    preciounitario NUMERIC NOT NULL
 );
-INSERT INTO rol (nombrerol) VALUES ('Administrador'), ('Vendedor');
+INSERT INTO rol (nombrerol, administra) VALUES ('Administrador', 1), ('Vendedor', 0);
 INSERT INTO categoria (nombre) VALUES ('Papelería'), ('Libros');
 INSERT INTO marca (nombremarca) VALUES ('Genérica'), ('Norma');
 INSERT INTO proveedor (nombreproveedor, telefono) VALUES ('Distribuidora Central', '22334455');

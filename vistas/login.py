@@ -1,15 +1,18 @@
 """
 Pantalla de inicio de sesión (RF01).
 
-Tras varios intentos fallidos el botón se bloquea durante unos segundos. Es una
-traba sencilla contra el tanteo de contraseñas: no reemplaza al cifrado (RNF04),
-pero encarece probar claves al azar en el equipo de la librería.
+La pantalla no decide nada sobre la seguridad del acceso: pide las
+credenciales, se las pasa a :mod:`modulos.auth.servicios` y muestra lo que ese
+le responda, incluido el aviso de bloqueo por demasiados intentos.
+
+Antes llevaba su propio contador de fallos y su propio temporizador. Era una
+regla de seguridad viviendo en la interfaz: reiniciar la aplicación la
+reiniciaba, y cualquier otro llamador del servicio quedaba fuera de su alcance.
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 from collections.abc import Callable
 
 import flet as ft
@@ -31,11 +34,10 @@ from tema import (
     estilo_boton,
 )
 from vistas.componentes.campos import campo_contrasena, campo_texto
+from vistas.componentes.notificaciones import MENSAJE_INESPERADO
 
 logger = logging.getLogger(__name__)
 
-INTENTOS_ANTES_DE_BLOQUEAR = 3
-SEGUNDOS_BLOQUEO = 30
 ANCHO_TARJETA = 420
 ANCHO_CAMPO = 340
 
@@ -52,7 +54,6 @@ class PantallaLogin:
         self._pagina = pagina
         self._al_entrar = al_entrar
         self._servicio = ServicioAutenticacion()
-        self._intentos_fallidos = 0
 
         self._usuario = campo_texto(
             "Usuario", icono=ft.Icons.PERSON, width=ANCHO_CAMPO, autofocus=True
@@ -133,54 +134,18 @@ class PantallaLogin:
         try:
             sesion = self._servicio.iniciar_sesion(self._usuario.value, self._contrasena.value)
         except ErrorAutenticacion as error:
-            self._registrar_fallo(str(error))
+            self._contrasena.value = ""
+            self._mostrar_mensaje(str(error))
             return
         except ErrorAplicacion as error:
             self._mostrar_mensaje(str(error))
             return
-        except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
+        except Exception:  # noqa: BLE001 - último recurso para no tumbar la interfaz
             logger.exception("Fallo inesperado al iniciar sesión")
-            self._mostrar_mensaje(f"No se pudo conectar con la base de datos: {error}")
+            self._mostrar_mensaje(MENSAJE_INESPERADO)
             return
 
-        self._intentos_fallidos = 0
         self._al_entrar(sesion)
-
-    def _registrar_fallo(self, mensaje: str) -> None:
-        """
-        Cuenta el intento fallido y bloquea el botón si son demasiados.
-
-        Args:
-            mensaje: Mensaje de error a mostrar.
-        """
-        self._intentos_fallidos += 1
-        self._contrasena.value = ""
-
-        restantes = INTENTOS_ANTES_DE_BLOQUEAR - self._intentos_fallidos
-        if restantes > 0:
-            self._mostrar_mensaje(f"{mensaje}. Intentos restantes: {restantes}")
-            return
-
-        self._bloquear()
-
-    def _bloquear(self) -> None:
-        """Desactiva el botón un rato para frenar el tanteo de contraseñas."""
-        self._boton.disabled = True
-        self._mostrar_mensaje(
-            f"Demasiados intentos fallidos. Espere {SEGUNDOS_BLOQUEO} segundos."
-        )
-        logger.warning("Acceso bloqueado tras %d intentos fallidos", self._intentos_fallidos)
-
-        temporizador = threading.Timer(SEGUNDOS_BLOQUEO, self._desbloquear)
-        temporizador.daemon = True
-        temporizador.start()
-
-    def _desbloquear(self) -> None:
-        """Vuelve a habilitar el botón y reinicia el contador de intentos."""
-        self._intentos_fallidos = 0
-        self._boton.disabled = False
-        self._mensaje.visible = False
-        self._pagina.update()
 
     def _mostrar_mensaje(self, texto: str) -> None:
         """

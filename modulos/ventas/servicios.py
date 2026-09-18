@@ -70,7 +70,10 @@ class ServicioVentas:
 
         with transaccion(self._conexion) as conexion:
             productos = ProductoRepositorio(conexion)
-            total = self._calcular_total(productos, lineas)
+            precios = self._cotizar(productos, lineas)
+            total = sum(
+                (precios[idp] * cant for idp, cant in lineas.items()), Decimal("0")
+            ).quantize(CENTAVO)
 
             if efectivo < total:
                 raise ErrorValidacion(
@@ -84,7 +87,7 @@ class ServicioVentas:
             idventa = ventas.registrar_cabecera(idusuario, total, efectivo, cambio)
 
             for idproducto, cantidad in lineas.items():
-                ventas.registrar_detalle(idventa, idproducto, cantidad)
+                ventas.registrar_detalle(idventa, idproducto, cantidad, precios[idproducto])
                 inventario.registrar_movimiento(idproducto, TipoMovimiento.VENTA, cantidad)
 
             logger.info(
@@ -163,22 +166,29 @@ class ServicioVentas:
             return anulada
 
     @staticmethod
-    def _calcular_total(productos: ProductoRepositorio, lineas: dict[int, int]) -> Decimal:
+    def _cotizar(
+        productos: ProductoRepositorio, lineas: dict[int, int]
+    ) -> dict[int, Decimal]:
         """
-        Suma el importe de la venta leyendo precio y stock de la base de datos (RF09).
+        Fija el precio de cada línea y comprueba las existencias (RF09).
+
+        Devuelve los precios en lugar de solo el total porque la venta tiene
+        que guardarlos: son los que verá la factura para siempre. Antes se
+        leían, se sumaban y se descartaban, y la factura volvía a preguntarle
+        el precio al catálogo cada vez que se reimprimía.
 
         Args:
             productos: Repositorio atado a la transacción en curso.
             lineas: Producto → cantidad.
 
         Returns:
-            Importe total con dos decimales.
+            Producto → precio unitario pactado.
 
         Raises:
             ErrorNoEncontrado: Si algún producto ya no existe.
             ErrorStockInsuficiente: Si no hay existencias para alguna línea.
         """
-        total = Decimal("0")
+        precios: dict[int, Decimal] = {}
         for idproducto, cantidad in lineas.items():
             datos = productos.obtener_precio_y_stock(idproducto)
             if datos is None:
@@ -187,8 +197,8 @@ class ServicioVentas:
                 raise ErrorStockInsuficiente(
                     f"Solo quedan {datos['stock']} unidades de «{datos['descripcion']}»"
                 )
-            total += datos["precioventa"] * cantidad
-        return total.quantize(CENTAVO)
+            precios[idproducto] = datos["precioventa"]
+        return precios
 
 
 def _validar_articulos(articulos: list[dict]) -> dict[int, int]:

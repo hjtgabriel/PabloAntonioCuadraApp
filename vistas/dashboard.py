@@ -22,7 +22,11 @@ from modulos.personal.modelos import UsuarioAutenticado
 from nucleo.errores import ErrorAplicacion
 from tema import ACENTO, ESPACIO, FONDO, NAV_BG, SUPERFICIE, TEXTO, TEXTO_SUBTITULO
 from vistas.catalogos import pantalla_categorias, pantalla_marcas, pantalla_roles
-from vistas.componentes.notificaciones import avisar_advertencia, avisar_error
+from vistas.componentes.notificaciones import (
+    MENSAJE_INESPERADO,
+    avisar_advertencia,
+    avisar_error,
+)
 from vistas.historiales import pantalla_historial_inventario, pantalla_historial_precios
 from vistas.inventario import pantalla_inventario
 from vistas.personal import pantalla_empleados, pantalla_usuarios
@@ -292,9 +296,11 @@ class PanelPrincipal:
             self._contenido.content = seccion.construir(self._pagina, self._sesion)
         except ErrorAplicacion as error:
             self._contenido.content = self._aviso_error(str(error))
-        except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
+        except Exception:  # noqa: BLE001 - último recurso para no tumbar la interfaz
             logger.exception("Fallo al abrir la sección «%s»", seccion.etiqueta)
-            self._contenido.content = self._aviso_error(f"No se pudo abrir «{seccion.etiqueta}»: {error}")
+            self._contenido.content = self._aviso_error(
+                f"No se pudo abrir «{seccion.etiqueta}». {MENSAJE_INESPERADO}"
+            )
 
         self._pagina.update()
 

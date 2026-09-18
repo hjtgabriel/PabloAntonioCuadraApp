@@ -24,6 +24,7 @@ from modulos.ventas.modelos import CENTAVO, DetalleVenta, LineaCarrito, Venta
 from modulos.ventas.servicios import ServicioVentas
 from nucleo.documentos import abrir, guardar
 from nucleo.errores import ErrorAplicacion
+from nucleo.formato import importe
 from tema import (
     ACENTO,
     BORDE,
@@ -42,11 +43,15 @@ from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.campos import campo_decimal
 from vistas.componentes.dialogos import DialogoInformacion
 from vistas.componentes.layout import encabezado, estado_vacio
-from vistas.componentes.notificaciones import avisar_advertencia, avisar_error, avisar_exito
+from vistas.componentes.notificaciones import (
+    avisar_advertencia,
+    avisar_error,
+    avisar_exito,
+    avisar_fallo_inesperado,
+)
 from vistas.componentes.refresco import refrescar
 
 RESULTADOS_BUSQUEDA = 30
-MONEDA = "C$"
 
 
 class PuntoDeVenta:
@@ -138,7 +143,7 @@ class PuntoDeVenta:
         return ft.ListTile(
             title=ft.Text(producto.descripcion, color=TEXTO),
             subtitle=ft.Text(
-                f"Stock: {producto.stock}  ·  {MONEDA} {producto.precioventa:,.2f}",
+                f"Stock: {producto.stock}  ·  {importe(producto.precioventa)}",
                 color=ERROR if sin_stock else TEXTO_ATENUADO,
                 size=12,
             ),
@@ -277,7 +282,7 @@ class PuntoDeVenta:
                         [
                             ft.Text(linea.descripcion, color=TEXTO, weight=ft.FontWeight.W_500),
                             ft.Text(
-                                f"{MONEDA} {linea.precio:,.2f} c/u",
+                                f"{importe(linea.precio)} c/u",
                                 size=12,
                                 color=TEXTO_ATENUADO,
                             ),
@@ -302,7 +307,7 @@ class PuntoDeVenta:
                         on_click=lambda _evento, item=linea: self._cambiar_cantidad(item, 1),
                     ),
                     ft.Text(
-                        f"{MONEDA} {linea.subtotal:,.2f}",
+                        importe(linea.subtotal),
                         color=TEXTO,
                         weight=ft.FontWeight.BOLD,
                         width=100,
@@ -326,7 +331,7 @@ class PuntoDeVenta:
     def _actualizar_totales(self) -> None:
         """Recalcula el total a cobrar y el cambio a entregar (RF09)."""
         total = self._total_carrito()
-        self._total.value = f"Total: {MONEDA} {total:,.2f}"
+        self._total.value = f"Total: {importe(total)}"
 
         efectivo = self._efectivo_escrito()
         if efectivo is None:
@@ -334,10 +339,10 @@ class PuntoDeVenta:
             self._cambio.color = TEXTO_ATENUADO
         elif efectivo < total:
             faltante = total - efectivo
-            self._cambio.value = f"Faltan {MONEDA} {faltante:,.2f}"
+            self._cambio.value = f"Faltan {importe(faltante)}"
             self._cambio.color = ERROR
         else:
-            self._cambio.value = f"Cambio: {MONEDA} {efectivo - total:,.2f}"
+            self._cambio.value = f"Cambio: {importe(efectivo - total)}"
             self._cambio.color = EXITO
 
     def _al_cambiar_efectivo(self, _evento: ft.ControlEvent) -> None:
@@ -364,7 +369,7 @@ class PuntoDeVenta:
             avisar_error(self._pagina, str(error))
             return
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            avisar_error(self._pagina, f"Ocurrió un problema inesperado: {error}")
+            avisar_fallo_inesperado(self._pagina, "registrar la venta", error)
             return
 
         avisar_exito(self._pagina, f"Venta {comprobante.idventa} registrada")
@@ -503,8 +508,8 @@ def _factura(
             *[_linea_factura(detalle) for detalle in venta.detalles],
             ft.Divider(height=1),
             *[
-                _total_factura(etiqueta, importe, destacado)
-                for etiqueta, importe, destacado in (
+                _total_factura(etiqueta, monto, destacado)
+                for etiqueta, monto, destacado in (
                     ("Total", venta.totalventa, True),
                     ("Efectivo recibido", venta.efectivorecibido, False),
                     ("Cambio entregado", venta.cambioentregado, False),
@@ -547,7 +552,7 @@ def _linea_factura(detalle: DetalleVenta) -> ft.Row:
             ft.Text(f"{detalle.cantidad} ×", color=TEXTO, width=36),
             ft.Text(detalle.descripcion or "—", color=TEXTO, expand=True, size=13),
             ft.Text(
-                f"{MONEDA} {Decimal(str(detalle.subtotal or 0)):,.2f}",
+                importe(detalle.subtotal),
                 color=TEXTO,
                 weight=ft.FontWeight.W_500,
             ),
@@ -556,13 +561,13 @@ def _linea_factura(detalle: DetalleVenta) -> ft.Row:
     )
 
 
-def _total_factura(etiqueta: str, importe: Decimal, destacado: bool) -> ft.Row:
+def _total_factura(etiqueta: str, monto: Decimal, destacado: bool) -> ft.Row:
     """
     Arma una de las filas de totales de la factura.
 
     Args:
         etiqueta: Rótulo de la fila.
-        importe: Importe a mostrar.
+        monto: Importe a mostrar.
         destacado: Si es el total, que se resalta.
 
     Returns:
@@ -573,7 +578,7 @@ def _total_factura(etiqueta: str, importe: Decimal, destacado: bool) -> ft.Row:
             ft.Text(etiqueta, color=TEXTO, weight=ft.FontWeight.BOLD if destacado else None),
             ft.Container(expand=True),
             ft.Text(
-                f"{MONEDA} {importe:,.2f}",
+                importe(monto),
                 color=EXITO if etiqueta.startswith("Cambio") else TEXTO,
                 weight=ft.FontWeight.BOLD,
                 size=16 if destacado else 14,

@@ -57,6 +57,28 @@ class Usuario:
     contrasena: str
 
 
+@dataclass(slots=True, frozen=True)
+class Credencial:
+    """
+    Hash almacenado junto con los datos de sesión de un usuario.
+
+    Existe para que la autenticación resuelva con una sola consulta lo que
+    antes pedía dos, sin meter el hash dentro de
+    :class:`UsuarioAutenticado`: ese objeto viaja hasta la interfaz y no debe
+    llevar la credencial encima.
+
+    Solo lo usa :mod:`modulos.auth.servicios`, y se descarta en cuanto se
+    valida la contraseña.
+
+    Attributes:
+        hash_contrasena: Contraseña cifrada tal como está guardada.
+        sesion: Datos que la interfaz necesita si la validación sale bien.
+    """
+
+    hash_contrasena: str
+    sesion: UsuarioAutenticado
+
+
 @dataclass(slots=True)
 class UsuarioAutenticado:
     """
@@ -72,7 +94,9 @@ class UsuarioAutenticado:
         nombres: Nombres del empleado.
         apellidos: Apellidos del empleado.
         idrol: Clave del rol.
-        rol: Nombre del rol, usado para decidir el menú visible (RF02).
+        rol: Nombre del rol, solo para mostrarlo en la cabecera.
+        rol_administra: Si el rol autoriza las secciones de administración
+            (RF02). Viene de la base y no se deduce del nombre.
     """
 
     idusuario: int
@@ -82,6 +106,7 @@ class UsuarioAutenticado:
     apellidos: str
     idrol: int
     rol: str
+    rol_administra: bool = False
 
     @property
     def nombre_completo(self) -> str:
@@ -91,9 +116,11 @@ class UsuarioAutenticado:
     @property
     def es_administrador(self) -> bool:
         """
-        Indica si el rol tiene privilegios de administración (RF02).
+        Indica si el rol autoriza las secciones de administración (RF02).
 
-        La comparación ignora mayúsculas y acentos del sufijo para tolerar
-        «Administrador» y «Administración» como equivalentes.
+        Se apoya en la marca «administra» del rol y no en cómo esté escrito su
+        nombre. Antes bastaba con que empezara por «admin», de modo que
+        renombrar el rol a «Gerencia» dejaba a esa persona sin permisos sin que
+        nadie se enterara.
         """
-        return self.rol.strip().lower().startswith("admin")
+        return self.rol_administra

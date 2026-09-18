@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from modulos.ventas.modelos import DetalleVenta, Venta
 from nucleo.base_datos import obtener_motor
+from nucleo.formato import a_decimal
 from nucleo.repositorio import RepositorioBase, a_fecha
 
 CONSULTA_VENTAS = """
@@ -35,9 +36,9 @@ class VentaRepositorio(RepositorioBase[Venta]):
             idventa=fila["idventa"],
             idusuario=fila["idusuario"],
             fechaventa=a_fecha(fila["fechaventa"]),
-            totalventa=_a_decimal(fila["totalventa"]),
-            efectivorecibido=_a_decimal(fila["efectivorecibido"]),
-            cambioentregado=_a_decimal(fila["cambioentregado"]),
+            totalventa=a_decimal(fila["totalventa"]),
+            efectivorecibido=a_decimal(fila["efectivorecibido"]),
+            cambioentregado=a_decimal(fila["cambioentregado"]),
             nombreusuario=fila.get("nombreusuario"),
         )
 
@@ -81,18 +82,26 @@ class VentaRepositorio(RepositorioBase[Venta]):
         fila = self.consultar_uno("SELECT MAX(idventa) AS idventa FROM venta")
         return int(fila["idventa"])
 
-    def registrar_detalle(self, idventa: int, idproducto: int, cantidad: int) -> None:
+    def registrar_detalle(
+        self, idventa: int, idproducto: int, cantidad: int, preciounitario: Decimal
+    ) -> None:
         """
-        Inserta una línea de la venta.
+        Inserta una línea de la venta con el precio que se pactó.
+
+        El precio queda congelado en la línea: una factura es el documento de
+        un momento concreto y no puede reescribirse porque después haya
+        cambiado la lista de precios.
 
         Args:
             idventa: Venta a la que pertenece.
             idproducto: Producto vendido.
             cantidad: Unidades vendidas.
+            preciounitario: Precio unitario cobrado.
         """
         self.ejecutar(
-            "INSERT INTO detalleventa (idventa, idproducto, cantidad) VALUES (?, ?, ?)",
-            (idventa, idproducto, cantidad),
+            "INSERT INTO detalleventa (idventa, idproducto, cantidad, preciounitario)"
+            " VALUES (?, ?, ?, ?)",
+            (idventa, idproducto, cantidad, str(preciounitario)),
         )
 
     def listar_recientes(self, limite: int | None = None) -> list[Venta]:
@@ -132,7 +141,11 @@ class VentaRepositorio(RepositorioBase[Venta]):
 
     def listar_detalles(self, idventa: int) -> list[DetalleVenta]:
         """
-        Devuelve las líneas de una venta con su subtotal.
+        Devuelve las líneas de una venta con el precio que se pactó.
+
+        El precio sale de «detalleventa» y no de «producto»: tomarlo del
+        catálogo hacía que una factura reimpresa mostrara importes distintos a
+        los cobrados en su día.
 
         Args:
             idventa: Clave de la venta.
@@ -143,8 +156,8 @@ class VentaRepositorio(RepositorioBase[Venta]):
         filas = self.consultar(
             """
             SELECT d.iddetalleventa, d.idventa, d.idproducto, d.cantidad,
-                   p.descripcion, p.precioventa,
-                   (d.cantidad * p.precioventa) AS subtotal
+                   d.preciounitario, p.descripcion,
+                   (d.cantidad * d.preciounitario) AS subtotal
             FROM detalleventa d
             JOIN producto p ON d.idproducto = p.idproducto
             WHERE d.idventa = ?
@@ -159,8 +172,8 @@ class VentaRepositorio(RepositorioBase[Venta]):
                 idproducto=fila["idproducto"],
                 cantidad=int(fila["cantidad"]),
                 descripcion=fila.get("descripcion"),
-                precioventa=_a_decimal(fila["precioventa"]),
-                subtotal=_a_decimal(fila["subtotal"]),
+                precioventa=a_decimal(fila["preciounitario"]),
+                subtotal=a_decimal(fila["subtotal"]),
             )
             for fila in filas
         ]
@@ -176,18 +189,3 @@ class VentaRepositorio(RepositorioBase[Venta]):
             Cantidad de líneas borradas.
         """
         return self.ejecutar("DELETE FROM detalleventa WHERE idventa = ?", (idventa,))
-
-
-def _a_decimal(valor: object) -> Decimal:
-    """
-    Convierte a ``Decimal`` un importe leído de la base de datos.
-
-    Args:
-        valor: Valor tal como lo devolvió el driver.
-
-    Returns:
-        El importe como ``Decimal``; cero si el valor era nulo.
-    """
-    if valor is None:
-        return Decimal("0")
-    return Decimal(str(valor))

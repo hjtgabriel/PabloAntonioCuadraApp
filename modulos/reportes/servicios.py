@@ -14,6 +14,7 @@ from datetime import date
 from decimal import Decimal
 
 from nucleo.base_datos import Conexion, obtener_motor
+from nucleo.formato import a_decimal
 from nucleo.repositorio import RepositorioBase
 
 DIAS_SEMANA = 7
@@ -152,9 +153,9 @@ class ServicioReportes:
             VentaDiaria(
                 fecha=fila["fecha"],
                 cantidad_ventas=int(fila["cantidad_ventas"] or 0),
-                total_vendido=_a_decimal(fila["total_vendido"]),
-                total_efectivo=_a_decimal(fila["total_efectivo"]),
-                total_cambio=_a_decimal(fila["total_cambio"]),
+                total_vendido=a_decimal(fila["total_vendido"]),
+                total_efectivo=a_decimal(fila["total_efectivo"]),
+                total_cambio=a_decimal(fila["total_cambio"]),
             )
             for fila in self._consulta.consultar(sql)
         ]
@@ -189,7 +190,7 @@ class ServicioReportes:
                 marca=fila["marca"],
                 categoria=fila["categoria"],
                 unidades=int(fila["unidades"] or 0),
-                importe=_a_decimal(fila["importe"]),
+                importe=a_decimal(fila["importe"]),
             )
             for fila in self._consulta.consultar(sql, (limite,))
         ]
@@ -245,19 +246,3 @@ def _clasificar_stock(stock: int, minimo: int) -> str:
     if stock <= minimo * 2:
         return ESTADO_BAJO
     return ESTADO_NORMAL
-
-
-def _a_decimal(valor: object) -> Decimal:
-    """
-    Convierte a ``Decimal`` un importe agregado.
-
-    Args:
-        valor: Valor tal como lo devolvió el driver; puede ser None si el grupo
-            no tenía filas.
-
-    Returns:
-        El importe como ``Decimal``; cero si el valor era nulo.
-    """
-    if valor is None:
-        return Decimal("0")
-    return Decimal(str(valor))

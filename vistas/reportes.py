@@ -21,6 +21,7 @@ from modulos.reportes.servicios import (
     VentaDiaria,
 )
 from nucleo.errores import ErrorAplicacion
+from nucleo.formato import importe
 from tema import (
     ACENTO,
     AVISO,
@@ -33,10 +34,8 @@ from tema import (
     estilo_boton,
 )
 from vistas.componentes.layout import encabezado, indicador
-from vistas.componentes.notificaciones import avisar_error
+from vistas.componentes.notificaciones import avisar_error, avisar_fallo_inesperado
 from vistas.componentes.tablas import Columna, TablaDatos
-
-MONEDA = "C$"
 
 
 @dataclass(slots=True)
@@ -126,9 +125,9 @@ class PantallaReportes:
                 columnas=[
                     Columna("fecha", "Fecha", formato=str),
                     Columna("cantidad_ventas", "N.º de ventas", numerica=True),
-                    Columna("total_vendido", "Total vendido", formato=_moneda, numerica=True),
-                    Columna("total_efectivo", "Efectivo recibido", formato=_moneda, numerica=True),
-                    Columna("total_cambio", "Cambio entregado", formato=_moneda, numerica=True),
+                    Columna("total_vendido", "Total vendido", formato=importe, numerica=True),
+                    Columna("total_efectivo", "Efectivo recibido", formato=importe, numerica=True),
+                    Columna("total_cambio", "Cambio entregado", formato=importe, numerica=True),
                 ],
                 cargar=self._servicio.ventas_semanales,
                 indicadores=_indicadores_ventas,
@@ -142,7 +141,7 @@ class PantallaReportes:
                     Columna("marca", "Marca"),
                     Columna("categoria", "Categoría"),
                     Columna("unidades", "Unidades", numerica=True),
-                    Columna("importe", "Importe", formato=_moneda, numerica=True),
+                    Columna("importe", "Importe", formato=importe, numerica=True),
                 ],
                 cargar=self._servicio.articulos_mas_vendidos,
                 indicadores=_indicadores_vendidos,
@@ -182,7 +181,7 @@ class PantallaReportes:
             avisar_error(self._pagina, str(error))
             return
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            avisar_error(self._pagina, f"No se pudo generar el reporte: {error}")
+            avisar_fallo_inesperado(self._pagina, "generar el reporte", error)
             return
 
         tabla = TablaDatos(
@@ -243,9 +242,9 @@ def _indicadores_ventas(filas: list[VentaDiaria]) -> list[ft.Control]:
 
     return [
         indicador("Ventas registradas", str(ventas), ACENTO, ft.Icons.RECEIPT_LONG),
-        indicador("Total facturado", _moneda(total), EXITO, ft.Icons.PAYMENTS),
-        indicador("Efectivo recibido", _moneda(efectivo), TEXTO, ft.Icons.ACCOUNT_BALANCE_WALLET),
-        indicador("Cambio entregado", _moneda(cambio), AVISO, ft.Icons.CURRENCY_EXCHANGE),
+        indicador("Total facturado", importe(total), EXITO, ft.Icons.PAYMENTS),
+        indicador("Efectivo recibido", importe(efectivo), TEXTO, ft.Icons.ACCOUNT_BALANCE_WALLET),
+        indicador("Cambio entregado", importe(cambio), AVISO, ft.Icons.CURRENCY_EXCHANGE),
     ]
 
 
@@ -293,19 +292,6 @@ def _indicadores_stock(filas: list[NivelStock]) -> list[ft.Control]:
 
 
 # ── Formateadores ───────────────────────────────────────────────────────
-
-
-def _moneda(valor: object) -> str:
-    """
-    Da formato de córdobas a un importe.
-
-    Args:
-        valor: Importe a formatear.
-
-    Returns:
-        El importe con símbolo y dos decimales.
-    """
-    return f"{MONEDA} {Decimal(str(valor or 0)):,.2f}"
 
 
 def _color_estado(fila: NivelStock) -> str:

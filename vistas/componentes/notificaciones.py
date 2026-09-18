@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 DURACION_MS = 4000
 
+MENSAJE_INESPERADO = (
+    "Ocurrió un problema inesperado. El detalle quedó en el registro de eventos."
+)
+
 
 def avisar(pagina: ft.Page, mensaje: str, color: str = TEXTO) -> None:
     """
@@ -77,3 +81,26 @@ def avisar_advertencia(pagina: ft.Page, mensaje: str) -> None:
         mensaje: Texto de la advertencia.
     """
     avisar(pagina, mensaje, AVISO)
+
+
+def avisar_fallo_inesperado(pagina: ft.Page, contexto: str, error: Exception) -> None:
+    """
+    Informa de un fallo imprevisto sin enseñarle sus tripas al usuario.
+
+    El texto de una excepción de base de datos suele traer el servidor, el
+    puerto, el nombre de la base y el usuario de conexión. Eso le sirve a quien
+    mantiene el sistema, no a quien está cobrando, y en la pantalla de acceso
+    se mostraría incluso antes de autenticar a nadie.
+
+    Por eso el detalle y la traza van al registro de eventos, y al usuario le
+    llega una frase que puede repetir por teléfono. Los errores de negocio
+    —los :class:`~nucleo.errores.ErrorAplicacion`— sí se muestran tal cual,
+    porque están escritos para que los lea él.
+
+    Args:
+        pagina: Página sobre la que mostrarlo.
+        contexto: Qué se estaba intentando, para poder situarlo en el registro.
+        error: Excepción capturada.
+    """
+    logger.exception("Fallo inesperado al %s", contexto, exc_info=error)
+    avisar(pagina, MENSAJE_INESPERADO, ERROR)

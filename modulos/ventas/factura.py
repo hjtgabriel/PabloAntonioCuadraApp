@@ -24,14 +24,11 @@ comprobar en las pruebas comparando texto, sin abrir ventanas.
 
 from __future__ import annotations
 
-from decimal import Decimal
 from html import escape
 from math import ceil
 
 from modulos.ventas.modelos import DetalleVenta, Venta
-
-MONEDA = "C$"
-FORMATO_FECHA = "%d/%m/%Y %H:%M"
+from nucleo.formato import FORMATO_FECHA_LARGA, fecha, importe
 
 ANCHO_ROLLO_MM = 80
 """Ancho de rollo por omisión; es el habitual en un punto de venta de mostrador."""
@@ -92,12 +89,12 @@ def componer_html(venta: Venta, nombre_negocio: str, ancho_mm: int = ANCHO_ROLLO
         titulo=escape(f"Factura {venta.idventa}"),
         negocio=escape(nombre_negocio),
         numero=f"{venta.idventa:05d}",
-        fecha=escape(venta.fechaventa.strftime(FORMATO_FECHA)),
+        fecha=escape(fecha(venta.fechaventa, FORMATO_FECHA_LARGA)),
         vendedor=escape(venta.nombreusuario or "—"),
         filas=_filas(venta),
-        total=_importe(venta.totalventa),
-        efectivo=_importe(venta.efectivorecibido),
-        cambio=_importe(venta.cambioentregado),
+        total=importe(venta.totalventa),
+        efectivo=importe(venta.efectivorecibido),
+        cambio=importe(venta.cambioentregado),
         articulos=_total_articulos(venta),
         ancho=ancho_mm,
         alto=alto_mm(venta, nombre_negocio, ancho_mm),
@@ -105,9 +102,7 @@ def componer_html(venta: Venta, nombre_negocio: str, ancho_mm: int = ANCHO_ROLLO
     )
 
 
-def alto_mm(
-    venta: Venta, nombre_negocio: str = "", ancho_mm: int = ANCHO_ROLLO_MM
-) -> int:
+def alto_mm(venta: Venta, nombre_negocio: str, ancho_mm: int = ANCHO_ROLLO_MM) -> int:
     """
     Calcula el alto de papel que necesita la factura.
 
@@ -126,7 +121,8 @@ def alto_mm(
     Args:
         venta: Venta a facturar.
         nombre_negocio: Encabezado del documento; en un rollo estrecho ocupa
-            más de un renglón y hay que contarlo.
+            más de un renglón y hay que contarlo. No tiene valor por omisión a
+            propósito: omitirlo daba un alto silenciosamente corto.
         ancho_mm: Ancho del rollo, que decide cuánto texto entra por línea.
 
     Returns:
@@ -191,8 +187,8 @@ def _filas(venta: Venta) -> str:
         "<tr>"
         f'<td class="cant">{detalle.cantidad}</td>'
         f"<td>{escape(detalle.descripcion or '—')}"
-        f'<br><span class="unitario">{_importe(detalle.precioventa)} c/u</span></td>'
-        f'<td class="num">{_importe(detalle.subtotal)}</td>'
+        f'<br><span class="unitario">{importe(detalle.precioventa)} c/u</span></td>'
+        f'<td class="num">{importe(detalle.subtotal)}</td>'
         "</tr>"
         for detalle in venta.detalles
     )
@@ -209,19 +205,6 @@ def _total_articulos(venta: Venta) -> str:
         El total de unidades como texto.
     """
     return str(sum(detalle.cantidad for detalle in venta.detalles))
-
-
-def _importe(valor: Decimal | None) -> str:
-    """
-    Da formato de moneda a un importe.
-
-    Args:
-        valor: Importe a mostrar; None se trata como cero.
-
-    Returns:
-        El importe con el símbolo de córdobas y dos decimales.
-    """
-    return f"{MONEDA} {Decimal(str(valor or 0)):,.2f}"
 
 
 _PLANTILLA = """<!DOCTYPE html>

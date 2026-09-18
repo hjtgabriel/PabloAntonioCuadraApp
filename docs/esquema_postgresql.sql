@@ -13,7 +13,12 @@
 
 CREATE TABLE IF NOT EXISTS rol (
     idrol       SERIAL PRIMARY KEY,
-    nombrerol   VARCHAR(50) NOT NULL UNIQUE
+    nombrerol   VARCHAR(50) NOT NULL UNIQUE,
+    -- Quién administra es un dato del rol, no una convención sobre su nombre.
+    -- Antes se deducía de que el nombre empezara por «admin», así que
+    -- renombrar el rol a «Gerencia» dejaba a esa persona sin permisos y sin
+    -- ningún aviso (RF02).
+    administra  BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS categoria (
@@ -95,7 +100,12 @@ CREATE TABLE IF NOT EXISTS detalleventa (
     iddetalleventa SERIAL PRIMARY KEY,
     idventa        INTEGER NOT NULL REFERENCES venta(idventa),
     idproducto     INTEGER NOT NULL REFERENCES producto(idproducto),
-    cantidad       INTEGER NOT NULL CHECK (cantidad > 0)
+    cantidad       INTEGER NOT NULL CHECK (cantidad > 0),
+    -- El precio pactado es un hecho de la venta, no del catálogo. Sin esta
+    -- columna la factura se calculaba con el precio actual del producto, de
+    -- modo que reimprimir una venta antigua tras un cambio de precio daba un
+    -- documento que se contradecía con su propio total.
+    preciounitario NUMERIC(18,2) NOT NULL CHECK (preciounitario >= 0)
 );
 
 -- ── Índices de apoyo ────────────────────────────────────────────────────
@@ -121,10 +131,10 @@ CREATE INDEX IF NOT EXISTS ix_usuario_empleado      ON usuario (idempleado);
 -- ── Datos iniciales ─────────────────────────────────────────────────────
 -- Los dos roles que exige el RF02. Se insertan solo si no existen.
 
-INSERT INTO rol (nombrerol)
-SELECT 'Administrador'
+INSERT INTO rol (nombrerol, administra)
+SELECT 'Administrador', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM rol WHERE nombrerol = 'Administrador');
 
-INSERT INTO rol (nombrerol)
-SELECT 'Vendedor'
+INSERT INTO rol (nombrerol, administra)
+SELECT 'Vendedor', FALSE
 WHERE NOT EXISTS (SELECT 1 FROM rol WHERE nombrerol = 'Vendedor');

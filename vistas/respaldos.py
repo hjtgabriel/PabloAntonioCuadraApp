@@ -8,6 +8,7 @@ aviso por correo funciona.
 
 from __future__ import annotations
 
+import logging
 import threading
 
 import flet as ft
@@ -28,7 +29,11 @@ from tema import (
     estilo_boton,
 )
 from vistas.componentes.layout import pantalla, tarjeta
-from vistas.componentes.notificaciones import avisar_error, avisar_exito
+from vistas.componentes.notificaciones import (
+    MENSAJE_INESPERADO,
+    avisar_error,
+    avisar_exito,
+)
 
 EXPLICACION = (
     "Todos los respaldos son completos: para restaurar basta un solo archivo, "
@@ -46,6 +51,9 @@ AVISO_VERIFICACION = (
     "Los respaldos antiguos solo se descartan después de comprobar que el nuevo "
     "se puede leer. Si la comprobación falla, no se borra nada."
 )
+
+logger = logging.getLogger(__name__)
+
 
 
 class PantallaRespaldos:
@@ -241,8 +249,9 @@ class PantallaRespaldos:
         except ErrorRespaldo as error:
             self._mostrar_fallo(str(error))
             return
-        except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            self._mostrar_fallo(f"Ocurrió un problema inesperado: {error}")
+        except Exception:  # noqa: BLE001 - último recurso para no tumbar la interfaz
+            logger.exception("Fallo inesperado al generar el respaldo")
+            self._mostrar_fallo(MENSAJE_INESPERADO)
             return
 
         self._mostrar_resultado(resultado)

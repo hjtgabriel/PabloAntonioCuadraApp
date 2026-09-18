@@ -46,16 +46,21 @@ class PaginaFalsa:
         """No hay ventana que refrescar."""
 
 
-def sesion(rol: str) -> UsuarioAutenticado:
+def sesion(rol: str, administra: bool | None = None) -> UsuarioAutenticado:
     """
     Arma una sesión de prueba con el rol indicado.
 
     Args:
         rol: Nombre del rol del usuario.
+        administra: Si el rol autoriza la administración. Si se omite, se
+            deduce del nombre por comodidad de las pruebas; el sistema real lo
+            lee de la columna «administra» del rol.
 
     Returns:
         La sesión lista para abrir el panel.
     """
+    if administra is None:
+        administra = rol.strip().lower().startswith("admin")
     return UsuarioAutenticado(
         idusuario=1,
         nombreusuario="ana",
@@ -64,6 +69,7 @@ def sesion(rol: str) -> UsuarioAutenticado:
         apellidos="Martínez",
         idrol=1,
         rol=rol,
+        rol_administra=administra,
     )
 
 
@@ -76,17 +82,18 @@ def pagina() -> PaginaFalsa:
 # ── Control de acceso por rol (RF02) ────────────────────────────────────
 
 
-def etiquetas_visibles(rol: str) -> list[str]:
+def etiquetas_visibles(rol: str, administra: bool | None = None) -> list[str]:
     """
     Lista las secciones que el menú ofrece a un rol.
 
     Args:
         rol: Nombre del rol a comprobar.
+        administra: Si el rol autoriza la administración.
 
     Returns:
         Las etiquetas de las secciones permitidas.
     """
-    panel = PanelPrincipal(PaginaFalsa(), sesion(rol), lambda: None)
+    panel = PanelPrincipal(PaginaFalsa(), sesion(rol, administra), lambda: None)
     return [seccion.etiqueta for seccion in panel._secciones]
 
 
@@ -110,10 +117,21 @@ def test_el_menu_del_vendedor_no_queda_vacio():
     assert etiquetas_visibles("Vendedor")
 
 
-@pytest.mark.parametrize("rol", ["Administrador", "administrador", "Administración", "  ADMIN  "])
-def test_el_rol_de_administracion_se_reconoce_sin_importar_como_este_escrito(rol):
-    """El RF02 no puede depender de mayúsculas, espacios ni del sufijo del rol."""
-    assert "Usuarios" in etiquetas_visibles(rol)
+@pytest.mark.parametrize("nombre", ["Administrador", "Gerencia", "Dirección", "Jefatura"])
+def test_los_permisos_no_dependen_de_como_se_llame_el_rol(nombre):
+    """
+    El RF02 se decide por la marca del rol, no por su nombre.
+
+    Antes bastaba con que el nombre empezara por «admin»: renombrar el rol a
+    «Gerencia» dejaba a esa persona sin permisos y sin ningún aviso.
+    """
+    assert "Usuarios" in etiquetas_visibles(nombre, administra=True)
+
+
+@pytest.mark.parametrize("nombre", ["Administrador", "Administración", "admin"])
+def test_un_nombre_parecido_no_concede_permisos_por_si_solo(nombre):
+    """Llamarse «Administrador» sin tener la marca no abre ninguna puerta."""
+    assert "Usuarios" not in etiquetas_visibles(nombre, administra=False)
 
 
 # ── Construcción del panel y de cada sección ────────────────────────────

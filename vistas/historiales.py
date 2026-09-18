@@ -20,6 +20,7 @@ from modulos.inventario.servicios import ServicioInventario
 from modulos.productos.modelos import CambioPrecio, FiltroCatalogo
 from modulos.productos.servicios import ServicioProductos
 from nucleo.errores import ErrorAplicacion
+from nucleo.formato import fecha, importe
 from tema import ACENTO, AVISO, ERROR, EXITO, TEXTO
 from vistas.componentes.campos import campo_seleccion
 from vistas.componentes.filtros import BarraFiltros
@@ -28,7 +29,6 @@ from vistas.componentes.notificaciones import avisar_error
 from vistas.componentes.tablas import Columna, TablaDatos
 
 TODOS = ""
-MONEDA = "C$"
 
 COLORES_MOVIMIENTO = {"Entrada": EXITO, "Salida": ERROR, "Venta": ERROR, "Ajuste": AVISO}
 
@@ -138,10 +138,10 @@ def pantalla_historial_precios(pagina: ft.Page) -> ft.Control:
         pagina,
         titulo="Historial de precios",
         columnas=[
-            Columna("fechacambio", "Fecha", formato=_formato_fecha),
+            Columna("fechacambio", "Fecha", formato=fecha),
             Columna("descripcion", "Producto"),
-            Columna("precioanterior", "Precio anterior", formato=_moneda, numerica=True),
-            Columna("precionuevo", "Precio nuevo", formato=_moneda, numerica=True),
+            Columna("precioanterior", "Precio anterior", formato=importe, numerica=True),
+            Columna("precionuevo", "Precio nuevo", formato=importe, numerica=True),
             Columna("variacion", "Variación", formato=_variacion, color=_color_variacion, numerica=True),
         ],
         cargar=lambda idproducto, filtro: ServicioProductos().listar_historial_precios(
@@ -165,7 +165,7 @@ def pantalla_historial_inventario(pagina: ft.Page) -> ft.Control:
         pagina,
         titulo="Historial de inventario",
         columnas=[
-            Columna("fechamovimiento", "Fecha", formato=_formato_fecha),
+            Columna("fechamovimiento", "Fecha", formato=fecha),
             Columna("descripcion", "Producto"),
             Columna("tipomovimiento", "Tipo", color=_color_movimiento),
             Columna("cantidad", "Cantidad", numerica=True),
@@ -180,36 +180,6 @@ def pantalla_historial_inventario(pagina: ft.Page) -> ft.Control:
 # ── Formateadores ───────────────────────────────────────────────────────
 
 
-def _formato_fecha(valor: object) -> str:
-    """
-    Da formato legible a una marca de tiempo.
-
-    Args:
-        valor: Fecha tal como llegó de la base de datos.
-
-    Returns:
-        La fecha en formato «AAAA-MM-DD HH:MM».
-    """
-    if valor is None:
-        return "—"
-    if hasattr(valor, "strftime"):
-        return valor.strftime("%Y-%m-%d %H:%M")
-    return str(valor)[:16]
-
-
-def _moneda(valor: object) -> str:
-    """
-    Da formato de córdobas a un importe.
-
-    Args:
-        valor: Importe a formatear.
-
-    Returns:
-        El importe con símbolo y dos decimales.
-    """
-    return f"{MONEDA} {Decimal(str(valor or 0)):,.2f}"
-
-
 def _variacion(valor: object) -> str:
     """
     Muestra una variación de precio con su flecha y su signo.
@@ -222,9 +192,9 @@ def _variacion(valor: object) -> str:
     """
     diferencia = Decimal(str(valor or 0))
     if diferencia > 0:
-        return f"▲ {MONEDA} {diferencia:,.2f}"
+        return f"▲ {importe(diferencia)}"
     if diferencia < 0:
-        return f"▼ {MONEDA} {abs(diferencia):,.2f}"
+        return f"▼ {importe(abs(diferencia))}"
     return "—"
 
 

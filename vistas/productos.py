@@ -16,6 +16,7 @@ from modulos.catalogos.servicios import servicio_categorias, servicio_marcas
 from modulos.productos.modelos import Producto
 from modulos.productos.servicios import ServicioProductos
 from modulos.proveedores.servicios import ServicioProveedores
+from nucleo.formato import importe
 from tema import color_estado_stock
 from vistas.componentes.campos import (
     campo_decimal,
@@ -132,8 +133,8 @@ def pantalla_productos(pagina: ft.Page) -> ft.Control:
                 Columna("descripcion", "Descripción"),
                 Columna("marca", "Marca", formato=lambda valor: valor or "—"),
                 Columna("categoria", "Categoría", formato=lambda valor: valor or "—"),
-                Columna("preciocompra", "P. compra", formato=_formato_importe, numerica=True),
-                Columna("precioventa", "P. venta", formato=_formato_importe, numerica=True),
+                Columna("preciocompra", "P. compra", formato=importe, numerica=True),
+                Columna("precioventa", "P. venta", formato=importe, numerica=True),
                 Columna("stock", "Stock", color=_color_stock, numerica=True),
                 Columna("stockminimo", "Mínimo", numerica=True),
             ],
@@ -194,19 +195,6 @@ def _opciones_proveedor() -> list[tuple[object, str]]:
         (proveedor.idproveedor, proveedor.nombreproveedor)
         for proveedor in ServicioProveedores().listar()
     ]
-
-
-def _formato_importe(valor: object) -> str:
-    """
-    Da formato de moneda a un importe de la tabla.
-
-    Args:
-        valor: Importe a mostrar.
-
-    Returns:
-        El importe con el símbolo de córdobas y dos decimales.
-    """
-    return f"C$ {Decimal(str(valor or 0)):,.2f}"
 
 
 def _color_stock(producto: Producto) -> str:

@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 
 import pytest
 
+from nucleo.base_datos import MotorSQLite, cerrar_motor, configurar_motor
 from nucleo.dialecto import (
     DialectoPostgreSQL,
     DialectoSQLite,
@@ -204,3 +206,316 @@ def test_insertar_devuelve_la_clave_generada(base_datos):
         conexion.confirmar()
     assert isinstance(identificador, int)
     assert identificador > 0
+
+
+# ── Ninguna consulta se ata a un motor concreto ─────────────────────────
+
+CONSTRUCCIONES_ATADAS = {
+    "ILIKE": "solo existe en PostgreSQL; use dialecto.comparar_texto()",
+    "SERIAL": "tipo de PostgreSQL; el esquema de cada motor va en docs/",
+    "AUTOINCREMENT": "tipo de SQLite; el esquema de cada motor va en docs/",
+    "NEXTVAL": "secuencias de PostgreSQL",
+    "INTERVAL": "sintaxis de fechas de PostgreSQL; use dialecto.hace_dias()",
+    "GETDATE": "sintaxis de SQL Server",
+    "NOW()": "difiere entre motores; use CURRENT_TIMESTAMP",
+    "::": "conversión de tipos propia de PostgreSQL",
+    "%S": "marcador de PostgreSQL; escriba «?» y deje traducir al dialecto",
+}
+
+ARCHIVOS_DE_DATOS = [
+    ruta
+    for carpeta in ("modulos", "nucleo")
+    for ruta in pathlib.Path(carpeta).rglob("*.py")
+    if ruta.name != "dialecto.py"
+]
+
+
+def literales_sql(ruta: pathlib.Path) -> list[str]:
+    """
+    Extrae de un archivo los textos que parecen consultas SQL.
+
+    Busca en los literales de cadena y no en el archivo entero para no
+    confundirse con los «%s» de los mensajes del registro de eventos.
+
+    Args:
+        ruta: Archivo a inspeccionar.
+
+    Returns:
+        Los literales que contienen una sentencia SQL.
+    """
+    arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+    palabras = ("SELECT ", "INSERT INTO", "UPDATE ", "DELETE FROM")
+    return [
+        nodo.value
+        for nodo in ast.walk(arbol)
+        if isinstance(nodo, ast.Constant)
+        and isinstance(nodo.value, str)
+        and any(palabra in nodo.value.upper() for palabra in palabras)
+    ]
+
+
+@pytest.mark.parametrize("ruta", ARCHIVOS_DE_DATOS, ids=lambda r: str(r))
+def test_ninguna_consulta_usa_sintaxis_de_un_solo_motor(ruta):
+    """
+    Migrar de motor no debe obligar a reescribir consultas una por una.
+
+    Todo lo que cambia entre motores vive en «nucleo/dialecto.py»: si una
+    consulta usa ILIKE o INTERVAL directamente, ese punto único deja de serlo.
+    """
+    encontradas = [
+        f"{construccion} ({motivo})"
+        for sql in literales_sql(ruta)
+        for construccion, motivo in CONSTRUCCIONES_ATADAS.items()
+        if construccion in sql.upper()
+    ]
+
+    assert not encontradas, f"{ruta} ata su SQL a un motor: " + "; ".join(encontradas)
+
+
+NOMBRES_DE_IDENTIFICADOR = frozenset({
+    "condicion", "asignaciones", "marcadores", "tabla", "clave", "orden",
+    "columnas", "alias", "prefijo",
+    # Fragmentos que devuelve el dialecto, guardados en una variable para que
+    # la consulta se lea mejor: «ahora = dialecto.ahora()».
+    "ahora", "fecha",
+})
+"""
+Variables locales que contienen nombres de tabla o fragmentos del dialecto.
+
+Es una lista cerrada a propósito. Admitir «cualquier nombre corto» dejaba pasar
+``f"... WHERE nombre = '{nombre}'"``, que es exactamente la inyección que esta
+prueba debe cazar: comprobado introduciéndola.
+"""
+
+PATRONES_PERMITIDOS = (
+    # Atributos y métodos del propio repositorio: self.tabla, self.clave,
+    # self._lista_columnas(), dependencia.columna.
+    re.compile(r"^self\.[A-Za-z_][A-Za-z0-9_]*(\(\))?$"),
+    re.compile(r"^[a-z_]+\.(tabla|clave|columna|columna_nombre|columna_clave)$"),
+    # El dialecto es el único autorizado a componer fragmentos de SQL: es
+    # justamente la pieza que aísla lo que cambia entre motores.
+    re.compile(r"^dialecto\.[a-z_]+\(.*\)$"),
+    # Listas de nombres de columna unidas para un INSERT.
+    re.compile(r"^'[,\s]*'\.join\([a-z_]+\)$"),
+)
+"""
+Formas de interpolación admitidas dentro de una consulta.
+
+Los nombres de tabla y de columna no pueden viajar como parámetro, así que no
+queda otra que interpolarlos. Los **valores** sí pueden, y por eso deben.
+"""
+
+
+def _es_interpolacion_admitida(expresion: str) -> bool:
+    """
+    Indica si lo interpolado en una consulta es un identificador y no un valor.
+
+    Args:
+        expresion: Código fuente de lo que se interpola.
+
+    Returns:
+        True si es un nombre declarado como identificador o encaja con alguna
+        de las formas autorizadas.
+    """
+    if expresion in NOMBRES_DE_IDENTIFICADOR:
+        return True
+    return any(patron.match(expresion) for patron in PATRONES_PERMITIDOS)
+
+
+@pytest.mark.parametrize("ruta", ARCHIVOS_DE_DATOS, ids=lambda r: str(r))
+def test_las_consultas_no_interpolan_valores(ruta):
+    """
+    Los valores viajan como parámetros, nunca dentro del texto de la consulta.
+
+    Es a la vez la defensa contra la inyección SQL y lo que permite que el
+    dialecto traduzca los marcadores al estilo de cada motor. Solo se admite
+    interpolar identificadores que el propio repositorio define.
+    """
+    sospechosas = [
+        f"línea {nodo.lineno}: {ast.unparse(trozo.value)}"
+        for nodo in ast.walk(ast.parse(ruta.read_text(encoding="utf-8")))
+        if isinstance(nodo, ast.JoinedStr) and _contiene_sql(nodo)
+        for trozo in nodo.values
+        if isinstance(trozo, ast.FormattedValue)
+        and not _es_interpolacion_admitida(ast.unparse(trozo.value))
+    ]
+
+    assert not sospechosas, f"{ruta} interpola valores en el SQL: " + "; ".join(sospechosas)
+
+
+def _contiene_sql(nodo: ast.JoinedStr) -> bool:
+    """
+    Indica si un literal con formato contiene una sentencia SQL.
+
+    Args:
+        nodo: Literal a revisar.
+
+    Returns:
+        True si alguna de sus partes fijas es SQL.
+    """
+    palabras = ("SELECT ", "INSERT INTO", "UPDATE ", "DELETE FROM", " WHERE ", " ORDER BY ")
+    return any(
+        isinstance(trozo, ast.Constant)
+        and isinstance(trozo.value, str)
+        and any(palabra in trozo.value.upper() for palabra in palabras)
+        for trozo in nodo.values
+    )
+
+
+# ── Los tipos sobreviven al cambio de motor ─────────────────────────────
+
+
+def test_el_booleano_del_rol_se_lee_igual_en_ambos_motores(base_datos):
+    """
+    SQLite no tiene BOOLEAN: guarda 0 y 1. PostgreSQL devuelve True y False.
+
+    La marca «administra» decide los permisos del RF02, así que leerla mal en
+    un motor dejaría al administrador sin acceso o se lo daría a un vendedor.
+    """
+    from modulos.personal.repositorio import UsuarioRepositorio
+    from modulos.personal.servicios import ServicioUsuarios
+
+    ServicioUsuarios().crear_con_empleado(
+        {
+            "nombres": "Ana",
+            "apellidos": "López",
+            "nombreusuario": "jefa",
+            "contrasena": "clave-segura-1",
+            "idrol": 1,
+        }
+    )
+
+    sesion = UsuarioRepositorio().obtener_autenticado("jefa")
+
+    assert isinstance(sesion.rol_administra, bool)
+    assert sesion.es_administrador is True
+
+
+# ── Añadir un motor nuevo no debe tocar el resto del código ──────────────
+
+
+class DialectoFuturo(DialectoSQLite):
+    """
+    Dialecto de un motor hipotético.
+
+    Hereda de SQLite para reusar su driver —lo que se prueba aquí no es el
+    driver— pero declara su propio nombre y cambia una traducción, que es
+    justo lo que distingue a un motor de otro.
+    """
+
+    nombre = "futuro"
+
+    def comparar_texto(self, columna: str) -> str:
+        """
+        Compara sin distinguir mayúsculas con la sintaxis de este motor.
+
+        Args:
+            columna: Columna a comparar.
+
+        Returns:
+            Condición lista para la cláusula WHERE.
+        """
+        return f"LOWER({columna}) LIKE LOWER(?)"
+
+
+class MotorFuturo(MotorSQLite):
+    """Motor nuevo: lo único que declara es que usa su propio dialecto."""
+
+    def __init__(self, ruta: str = ":memory:") -> None:
+        """
+        Args:
+            ruta: Archivo de la base.
+        """
+        super().__init__(ruta)
+        self._dialecto = DialectoFuturo()
+
+
+@pytest.fixture
+def motor_futuro():
+    """
+    Instala un motor recién inventado con el esquema de pruebas cargado.
+
+    Yields:
+        El motor activo para toda la aplicación.
+    """
+    from tests.conftest import ESQUEMA_PRUEBAS
+
+    motor = MotorFuturo(":memory:")
+    configurar_motor(motor)
+    with motor.conexion() as conexion:
+        conexion.driver.executescript(ESQUEMA_PRUEBAS)
+        conexion.confirmar()
+
+    yield motor
+
+    cerrar_motor()
+    configurar_motor(None)
+
+
+def test_la_aplicacion_entera_corre_sobre_un_motor_nuevo(motor_futuro):
+    """
+    Migrar de base de datos debe costar dos clases y nada más.
+
+    Esta prueba recorre el negocio completo —acceso, catálogo, búsqueda,
+    filtros, inventario, venta, factura y reportes— sobre un motor que no
+    existía al escribir ninguno de esos módulos. Si alguien ata una consulta a
+    PostgreSQL, aquí se nota.
+    """
+    from decimal import Decimal
+
+    from modulos.auth.servicios import ServicioAutenticacion
+    from modulos.inventario.servicios import ServicioInventario
+    from modulos.personal.servicios import ServicioUsuarios
+    from modulos.productos.modelos import FiltroCatalogo
+    from modulos.productos.servicios import ServicioProductos
+    from modulos.reportes.servicios import ServicioReportes
+    from modulos.ventas.factura import componer_html
+    from modulos.ventas.servicios import ServicioVentas
+
+    assert motor_futuro.dialecto.nombre == "futuro"
+
+    idusuario = ServicioUsuarios().crear_con_empleado(
+        {
+            "nombres": "Ana",
+            "apellidos": "López",
+            "nombreusuario": "ana",
+            "contrasena": "clave-segura-1",
+            "idrol": 1,
+        }
+    )
+    sesion = ServicioAutenticacion().iniciar_sesion("ana", "clave-segura-1")
+    assert sesion.es_administrador is True
+
+    productos = ServicioProductos()
+    idproducto = productos.crear(
+        {
+            "descripcion": "Cuaderno Universitario",
+            "idcategoria": 1,
+            "idmarca": 1,
+            "idproveedor": 1,
+            "preciocompra": Decimal("20.00"),
+            "precioventa": Decimal("100.00"),
+            "stock": 10,
+            "stockminimo": 2,
+        }
+    )
+    assert len(productos.listar("cuaderno")) == 1
+    assert len(productos.listar(filtro=FiltroCatalogo(idmarca=1))) == 1
+
+    ServicioInventario().registrar_movimiento(idproducto, "Entrada", 5)
+    assert productos.obtener(idproducto).stock == 15
+
+    ventas = ServicioVentas()
+    comprobante = ventas.registrar(
+        idusuario, [{"idproducto": idproducto, "cantidad": 2}], "500.00"
+    )
+
+    productos.actualizar(idproducto, {"precioventa": Decimal("999.00")})
+    venta = ventas.obtener_detalle(comprobante.idventa)
+    assert sum(linea.subtotal for linea in venta.detalles) == venta.totalventa
+
+    assert componer_html(venta, "Librería Pablo Antonio Cuadra", 80).startswith("<!DOCTYPE")
+
+    reportes = ServicioReportes()
+    assert reportes.ventas_semanales() != []
+    assert reportes.articulos_mas_vendidos() != []

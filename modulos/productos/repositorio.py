@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from modulos.productos.modelos import CambioPrecio, FiltroCatalogo, Producto
 from nucleo.base_datos import obtener_motor
+from nucleo.formato import a_decimal
 from nucleo.repositorio import RepositorioBase
 
 CONSULTA_PRODUCTOS_CON_RELACIONES = """
@@ -91,8 +92,8 @@ class ProductoRepositorio(RepositorioBase[Producto]):
             idcategoria=fila["idcategoria"],
             idmarca=fila["idmarca"],
             idproveedor=fila["idproveedor"],
-            preciocompra=_a_decimal(fila["preciocompra"]),
-            precioventa=_a_decimal(fila["precioventa"]),
+            preciocompra=a_decimal(fila["preciocompra"]),
+            precioventa=a_decimal(fila["precioventa"]),
             stock=int(fila["stock"] or 0),
             stockminimo=int(fila["stockminimo"] or 0),
             categoria=fila.get("categoria"),
@@ -177,6 +178,29 @@ class ProductoRepositorio(RepositorioBase[Producto]):
         )
         return [self._a_entidad(fila) for fila in filas]
 
+    def descontar_stock(self, idproducto: int, unidades: int) -> bool:
+        """
+        Descuenta existencias solo si alcanzan, en una sola sentencia.
+
+        La condición viaja dentro del ``UPDATE`` en vez de comprobarse antes en
+        Python. Leer el stock, decidir y después escribir deja una ventana en
+        la que otra venta simultánea puede colarse: ambas leen la última
+        unidad, ambas aprueban y ambas descuentan. Así la decisión la toma la
+        base de datos, que es quien puede tomarla sin carreras.
+
+        Args:
+            idproducto: Producto a descontar.
+            unidades: Unidades a retirar, en positivo.
+
+        Returns:
+            True si se descontó; False si no había existencias suficientes.
+        """
+        filas = self.ejecutar(
+            "UPDATE producto SET stock = stock - ? WHERE idproducto = ? AND stock >= ?",
+            (unidades, idproducto, unidades),
+        )
+        return filas == 1
+
     def ajustar_stock(self, idproducto: int, delta: int) -> int:
         """
         Suma (o resta) unidades al stock de un producto.
@@ -214,7 +238,7 @@ class ProductoRepositorio(RepositorioBase[Producto]):
             return None
         return {
             "descripcion": fila["descripcion"],
-            "precioventa": _a_decimal(fila["precioventa"]),
+            "precioventa": a_decimal(fila["precioventa"]),
             "stock": int(fila["stock"] or 0),
         }
 
@@ -247,8 +271,8 @@ class HistorialPreciosRepositorio(RepositorioBase[CambioPrecio]):
             idhistorial=fila["idhistorial"],
             idproducto=fila["idproducto"],
             fechacambio=fila["fechacambio"],
-            precioanterior=_a_decimal(fila["precioanterior"]),
-            precionuevo=_a_decimal(fila["precionuevo"]),
+            precioanterior=a_decimal(fila["precioanterior"]),
+            precionuevo=a_decimal(fila["precionuevo"]),
             descripcion=fila.get("descripcion"),
         )
 
@@ -304,21 +328,3 @@ class HistorialPreciosRepositorio(RepositorioBase[CambioPrecio]):
         sql += " ORDER BY h.fechacambio DESC, h.idhistorial DESC"
 
         return [self._a_entidad(fila) for fila in self.consultar(sql, parametros)]
-
-
-def _a_decimal(valor: object) -> Decimal:
-    """
-    Convierte a ``Decimal`` un valor monetario leído de la base de datos.
-
-    Pasa siempre por ``str`` para no heredar el error de redondeo que tendría
-    un ``float`` intermedio.
-
-    Args:
-        valor: Valor tal como lo devolvió el driver.
-
-    Returns:
-        El importe como ``Decimal``; cero si el valor era nulo.
-    """
-    if valor is None:
-        return Decimal("0")
-    return Decimal(str(valor))

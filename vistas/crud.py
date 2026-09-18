@@ -25,7 +25,11 @@ from vistas.componentes.busqueda import BarraBusqueda
 from vistas.componentes.dialogos import Campo, DialogoConfirmacion, DialogoFormulario
 from vistas.componentes.filtros import BarraFiltros
 from vistas.componentes.layout import pantalla_con_boton
-from vistas.componentes.notificaciones import avisar_error, avisar_exito
+from vistas.componentes.notificaciones import (
+    avisar_error,
+    avisar_exito,
+    avisar_fallo_inesperado,
+)
 from vistas.componentes.registros import leer_valor
 from vistas.componentes.tablas import Columna, TablaDatos
 
@@ -140,7 +144,7 @@ class PantallaCrud:
         except ErrorAplicacion as error:
             avisar_error(self._pagina, str(error))
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            avisar_error(self._pagina, f"No se pudo cargar {self._config.titulo}: {error}")
+            avisar_fallo_inesperado(self._pagina, f"cargar {self._config.titulo}", error)
 
     # ── Alta ────────────────────────────────────────────────────
 
@@ -260,8 +264,9 @@ class PantallaCrud:
             avisar_error(self._pagina, str(error))
             return
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            logger.exception("No se pudo armar el diálogo de %s", self._config.titulo)
-            avisar_error(self._pagina, f"No se pudo abrir el formulario: {error}")
+            avisar_fallo_inesperado(
+                self._pagina, f"abrir el formulario de {self._config.titulo}", error
+            )
             return
 
         self._pagina.show_dialog(dialogo)
@@ -283,7 +288,7 @@ class PantallaCrud:
             avisar_error(self._pagina, str(error))
             return
         except Exception as error:  # noqa: BLE001 - último recurso para no tumbar la interfaz
-            avisar_error(self._pagina, f"Ocurrió un problema inesperado: {error}")
+            avisar_fallo_inesperado(self._pagina, f"guardar en {self._config.titulo}", error)
             return
 
         avisar_exito(self._pagina, mensaje_exito)

@@ -42,10 +42,13 @@ Abra el archivo `.env` y escriba la contraseña de PostgreSQL en `DB_PASSWORD`.
 > subirse al repositorio. Ya está excluido en `.gitignore`.
 
 ```bash
-# 5. Crear el primer usuario administrador
+# 5. Si actualiza desde una versión anterior, aplique las migraciones
+psql -d PabloAntonioCuadraBD -f docs/migracion_001_precio_y_rol.sql
+
+# 6. Crear el primer usuario administrador
 python -m herramientas.crear_admin
 
-# 6. Iniciar la aplicación
+# 7. Iniciar la aplicación
 python main.py
 ```
 
@@ -216,6 +219,16 @@ quiere cambiarla: solo se reemplaza si escribe una nueva.
 
 No se puede eliminar un usuario que ya registró ventas: el historial debe
 conservar quién las hizo.
+
+**Quién administra** lo decide la columna `administra` del rol, no cómo se
+llame. Para dar permisos de administración a un rol nuevo:
+
+```sql
+UPDATE rol SET administra = TRUE WHERE nombrerol = 'Gerencia';
+```
+
+Antes se deducía de que el nombre empezara por «admin», de modo que renombrar
+el rol dejaba a esa persona sin permisos sin ningún aviso.
 
 ### 2.8. Respaldos
 
@@ -466,6 +479,13 @@ generada, operaciones con fechas). Para añadir un motor:
 
 No hay que tocar ningún repositorio, servicio ni pantalla. SQLite ya está
 implementado y sirve de ejemplo.
+
+Esto no es una promesa: `tests/test_portabilidad_bd.py` inventa un motor que no
+existía al escribir ninguno de los módulos y recorre con él el negocio
+completo —acceso, catálogo, búsqueda, filtros, inventario, venta, factura y
+reportes—. Además revisa el código en busca de consultas que se aten a un motor
+(`ILIKE`, `INTERVAL`, `SERIAL`) o que interpolen valores en vez de pasarlos
+como parámetros.
 
 ---
 

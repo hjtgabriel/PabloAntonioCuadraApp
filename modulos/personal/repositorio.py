@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from modulos.personal.modelos import Empleado, Usuario, UsuarioAutenticado
+from modulos.personal.modelos import (
+    Credencial,
+    Empleado,
+    Usuario,
+    UsuarioAutenticado,
+)
 from nucleo.base_datos import obtener_motor
 from nucleo.repositorio import RepositorioBase
 
@@ -16,10 +21,27 @@ CONSULTA_EMPLEADOS_CON_USUARIO = """
 
 CONSULTA_USUARIOS_CON_DETALLE = """
     SELECT u.idusuario, u.nombreusuario, u.idrol, r.nombrerol AS rol,
-           e.idempleado, e.nombres, e.apellidos, e.direccion, e.telefono
+           r.administra, e.idempleado, e.nombres, e.apellidos, e.direccion, e.telefono
     FROM usuario u
     JOIN empleado e ON u.idempleado = e.idempleado
     JOIN rol r ON u.idrol = r.idrol
+"""
+
+
+CONSULTA_CREDENCIAL = """
+    SELECT u.idusuario, u.nombreusuario, u.idrol, r.nombrerol AS rol,
+           r.administra, u.contrasena, e.idempleado, e.nombres, e.apellidos
+    FROM usuario u
+    JOIN empleado e ON u.idempleado = e.idempleado
+    JOIN rol r ON u.idrol = r.idrol
+    WHERE u.nombreusuario = ?
+"""
+"""
+Única consulta que trae la contraseña cifrada.
+
+Se mantiene separada de CONSULTA_USUARIOS_CON_DETALLE porque esa alimenta el
+listado de la pantalla de usuarios: añadirle la columna filtraba el hash a la
+interfaz, y una prueba lo detectó.
 """
 
 
@@ -218,6 +240,38 @@ class UsuarioRepositorio(RepositorioBase[Usuario]):
         )
         if not fila:
             return None
+        return self._a_sesion(fila)
+
+    def obtener_credencial(self, nombreusuario: str) -> Credencial | None:
+        """
+        Trae el hash y los datos de sesión en una sola consulta.
+
+        La autenticación necesita ambas cosas: antes pedía el usuario para
+        validar la contraseña y volvía a pedirlo para armar la sesión, con dos
+        viajes a la base por cada inicio de sesión.
+
+        Args:
+            nombreusuario: Identificador de acceso.
+
+        Returns:
+            La credencial, o None si el usuario no existe.
+        """
+        fila = self.consultar_uno(CONSULTA_CREDENCIAL, (nombreusuario.strip(),))
+        if not fila:
+            return None
+        return Credencial(hash_contrasena=fila["contrasena"], sesion=self._a_sesion(fila))
+
+    @staticmethod
+    def _a_sesion(fila: dict) -> UsuarioAutenticado:
+        """
+        Arma los datos de sesión a partir de una fila con detalle.
+
+        Args:
+            fila: Fila de CONSULTA_USUARIOS_CON_DETALLE.
+
+        Returns:
+            Los datos de sesión, sin la credencial.
+        """
         return UsuarioAutenticado(
             idusuario=fila["idusuario"],
             nombreusuario=fila["nombreusuario"],
@@ -226,4 +280,5 @@ class UsuarioRepositorio(RepositorioBase[Usuario]):
             apellidos=fila["apellidos"] or "",
             idrol=fila["idrol"],
             rol=fila["rol"] or "",
+            rol_administra=bool(fila.get("administra")),
         )

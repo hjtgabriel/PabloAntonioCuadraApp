@@ -16,13 +16,24 @@ RNF04 sin puertas traseras.
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 
 ALGORITMO = "sha256"
 ETIQUETA = "pbkdf2_sha256"
 ITERACIONES = 240_000
+ITERACIONES_MINIMAS = 100_000
+"""
+Piso de iteraciones aceptado al verificar.
+
+El número de iteraciones viaja dentro del hash almacenado, así que quien
+pudiera escribir en la base podría rebajarlo a uno y volver triviales los
+ataques por fuerza bruta contra los hashes robados.
+"""
 BYTES_SAL = 16
 LONGITUD_MINIMA = 8
+
+logger = logging.getLogger(__name__)
 
 
 def cifrar_contrasena(contrasena: str) -> str:
@@ -59,7 +70,8 @@ def verificar_contrasena(contrasena: str, hash_guardado: str) -> bool:
 
     Returns:
         True solo si la contraseña corresponde al hash. Cualquier formato
-        desconocido o corrupto devuelve False.
+        desconocido, corrupto o con menos iteraciones de las exigidas devuelve
+        False.
     """
     if not contrasena or not hash_guardado:
         return False
@@ -74,6 +86,10 @@ def verificar_contrasena(contrasena: str, hash_guardado: str) -> bool:
         sal = bytes.fromhex(sal_hex)
         resumen_esperado = bytes.fromhex(resumen_hex)
     except ValueError:
+        return False
+
+    if iteraciones < ITERACIONES_MINIMAS:
+        logger.warning("Hash almacenado con solo %d iteraciones; se rechaza", iteraciones)
         return False
 
     resumen_calculado = hashlib.pbkdf2_hmac(ALGORITMO, contrasena.encode("utf-8"), sal, iteraciones)
