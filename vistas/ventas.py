@@ -24,7 +24,7 @@ from modulos.ventas.modelos import CENTAVO, DetalleVenta, LineaCarrito, Venta
 from modulos.ventas.servicios import ServicioVentas
 from nucleo.documentos import abrir, guardar
 from nucleo.errores import ErrorAplicacion
-from nucleo.formato import importe
+from nucleo.formato import FORMATO_FECHA_LARGA, fecha, importe
 from tema import (
     ACENTO,
     BORDE,
@@ -52,6 +52,11 @@ from vistas.componentes.notificaciones import (
 from vistas.componentes.refresco import refrescar
 
 RESULTADOS_BUSQUEDA = 30
+ANCHO_FACTURA = 380
+ANCHO_SUBTOTAL = 100
+ESPACIO_FILA_CARRITO = 8
+RADIO_FILA_CARRITO = 8
+ICONO_FILA_CARRITO = 16
 
 
 class PuntoDeVenta:
@@ -278,54 +283,73 @@ class PuntoDeVenta:
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Column(
-                        [
-                            ft.Text(linea.descripcion, color=TEXTO, weight=ft.FontWeight.W_500),
-                            ft.Text(
-                                f"{importe(linea.precio)} c/u",
-                                size=12,
-                                color=TEXTO_ATENUADO,
-                            ),
-                        ],
-                        spacing=0,
-                        tight=True,
-                        expand=True,
-                    ),
-                    ft.IconButton(
-                        icon=ft.Icons.REMOVE,
-                        icon_size=16,
-                        icon_color=ACENTO,
-                        tooltip="Quitar una unidad",
-                        on_click=lambda _evento, item=linea: self._cambiar_cantidad(item, -1),
-                    ),
-                    ft.Text(str(linea.cantidad), color=TEXTO, weight=ft.FontWeight.BOLD),
-                    ft.IconButton(
-                        icon=ft.Icons.ADD,
-                        icon_size=16,
-                        icon_color=ACENTO,
-                        tooltip="Agregar una unidad",
-                        on_click=lambda _evento, item=linea: self._cambiar_cantidad(item, 1),
-                    ),
-                    ft.Text(
-                        importe(linea.subtotal),
-                        color=TEXTO,
-                        weight=ft.FontWeight.BOLD,
-                        width=100,
-                        text_align=ft.TextAlign.RIGHT,
-                    ),
-                    ft.IconButton(
-                        icon=ft.Icons.DELETE,
-                        icon_size=16,
-                        icon_color=ERROR,
-                        tooltip="Quitar del carrito",
-                        on_click=lambda _evento, item=linea: self._quitar(item),
-                    ),
+                    _nombre_y_precio(linea),
+                    *self._controles_de_cantidad(linea),
+                    _subtotal_de_linea(linea),
+                    self._boton_quitar(linea),
                 ],
                 spacing=4,
             ),
-            padding=8,
+            padding=ESPACIO_FILA_CARRITO,
             bgcolor=SUPERFICIE,
-            border_radius=8,
+            border_radius=RADIO_FILA_CARRITO,
+        )
+
+    def _controles_de_cantidad(self, linea: LineaCarrito) -> list[ft.Control]:
+        """
+        Arma los botones de más y menos con la cantidad entre ellos.
+
+        Args:
+            linea: Línea del carrito a la que pertenecen.
+
+        Returns:
+            Los tres controles, en orden de aparición.
+        """
+        return [
+            self._boton_unidad(linea, ft.Icons.REMOVE, "Quitar una unidad", -1),
+            ft.Text(str(linea.cantidad), color=TEXTO, weight=ft.FontWeight.BOLD),
+            self._boton_unidad(linea, ft.Icons.ADD, "Agregar una unidad", 1),
+        ]
+
+    def _boton_unidad(
+        self, linea: LineaCarrito, icono: str, ayuda: str, variacion: int
+    ) -> ft.IconButton:
+        """
+        Crea uno de los dos botones que cambian la cantidad de una línea.
+
+        Args:
+            linea: Línea del carrito a modificar.
+            icono: Icono del botón.
+            ayuda: Ayuda emergente.
+            variacion: Unidades a sumar; negativo para quitar.
+
+        Returns:
+            El botón conectado a su acción.
+        """
+        return ft.IconButton(
+            icon=icono,
+            icon_size=ICONO_FILA_CARRITO,
+            icon_color=ACENTO,
+            tooltip=ayuda,
+            on_click=lambda _evento, item=linea: self._cambiar_cantidad(item, variacion),
+        )
+
+    def _boton_quitar(self, linea: LineaCarrito) -> ft.IconButton:
+        """
+        Crea el botón que saca una línea entera del carrito.
+
+        Args:
+            linea: Línea a quitar.
+
+        Returns:
+            El botón conectado a su acción.
+        """
+        return ft.IconButton(
+            icon=ft.Icons.DELETE,
+            icon_size=ICONO_FILA_CARRITO,
+            icon_color=ERROR,
+            tooltip="Quitar del carrito",
+            on_click=lambda _evento, item=linea: self._quitar(item),
         )
 
     def _actualizar_totales(self) -> None:
@@ -479,6 +503,46 @@ def pantalla_ventas(pagina: ft.Page, idusuario: int) -> ft.Control:
     return PuntoDeVenta(pagina, idusuario).construir()
 
 
+def _nombre_y_precio(linea: LineaCarrito) -> ft.Column:
+    """
+    Arma el nombre del producto con su precio unitario debajo.
+
+    Args:
+        linea: Línea del carrito.
+
+    Returns:
+        La columna con ambos textos.
+    """
+    return ft.Column(
+        [
+            ft.Text(linea.descripcion, color=TEXTO, weight=ft.FontWeight.W_500),
+            ft.Text(f"{importe(linea.precio)} c/u", size=12, color=TEXTO_ATENUADO),
+        ],
+        spacing=0,
+        tight=True,
+        expand=True,
+    )
+
+
+def _subtotal_de_linea(linea: LineaCarrito) -> ft.Text:
+    """
+    Arma el importe de una línea, alineado a la derecha.
+
+    Args:
+        linea: Línea del carrito.
+
+    Returns:
+        El texto del subtotal.
+    """
+    return ft.Text(
+        importe(linea.subtotal),
+        color=TEXTO,
+        weight=ft.FontWeight.BOLD,
+        width=ANCHO_SUBTOTAL,
+        text_align=ft.TextAlign.RIGHT,
+    )
+
+
 def _factura(
     pagina: ft.Page, venta: Venta, al_imprimir: Callable[[Venta], None]
 ) -> ft.AlertDialog:
@@ -497,35 +561,10 @@ def _factura(
     Returns:
         El diálogo listo para mostrar.
     """
-    contenido = ft.Column(
-        [
-            ft.Text(
-                f"Factura N.º {venta.idventa:05d}  ·  {venta.fechaventa:%d/%m/%Y %H:%M}",
-                size=12,
-                color=TEXTO,
-            ),
-            ft.Divider(height=1),
-            *[_linea_factura(detalle) for detalle in venta.detalles],
-            ft.Divider(height=1),
-            *[
-                _total_factura(etiqueta, monto, destacado)
-                for etiqueta, monto, destacado in (
-                    ("Total", venta.totalventa, True),
-                    ("Efectivo recibido", venta.efectivorecibido, False),
-                    ("Cambio entregado", venta.cambioentregado, False),
-                )
-            ],
-        ],
-        tight=True,
-        spacing=ESPACIO,
-        width=380,
-        scroll=ft.ScrollMode.AUTO,
-    )
-
     return DialogoInformacion(
         pagina,
         "Venta registrada",
-        contenido,
+        _cuerpo_factura(venta),
         acciones=[
             ft.TextButton(
                 "Imprimir factura",
@@ -534,6 +573,40 @@ def _factura(
                 style=ft.ButtonStyle(color=ACENTO),
             )
         ],
+    )
+
+
+def _cuerpo_factura(venta: Venta) -> ft.Column:
+    """
+    Arma el contenido de la factura: cabecera, artículos y totales.
+
+    Args:
+        venta: Venta registrada, con sus líneas.
+
+    Returns:
+        La columna con la factura completa.
+    """
+    totales = (
+        ("Total", venta.totalventa, True),
+        ("Efectivo recibido", venta.efectivorecibido, False),
+        ("Cambio entregado", venta.cambioentregado, False),
+    )
+    return ft.Column(
+        [
+            ft.Text(
+                f"Factura N.º {venta.idventa:05d}  ·  {fecha(venta.fechaventa, FORMATO_FECHA_LARGA)}",
+                size=12,
+                color=TEXTO,
+            ),
+            ft.Divider(height=1),
+            *[_linea_factura(detalle) for detalle in venta.detalles],
+            ft.Divider(height=1),
+            *[_total_factura(*fila) for fila in totales],
+        ],
+        tight=True,
+        spacing=ESPACIO,
+        width=ANCHO_FACTURA,
+        scroll=ft.ScrollMode.AUTO,
     )
 
 

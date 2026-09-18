@@ -25,6 +25,10 @@ from nucleo.seguridad import LONGITUD_MINIMA
 ROL_ADMINISTRADOR = "Administrador"
 ROL_VENDEDOR = "Vendedor"
 
+SALIDA_CORRECTA = 0
+SALIDA_ERROR = 1
+SEPARADOR = "=" * 62
+
 
 def principal() -> int:
     """
@@ -34,35 +38,64 @@ def principal() -> int:
         0 si todo salió bien, 1 si hubo algún problema.
     """
     configurar_registro()
-    print("=" * 62)
-    print("  Librería Pablo Antonio Cuadra — Crear usuario administrador")
-    print("=" * 62)
+    _saludar()
 
-    try:
-        _asegurar_roles()
-        idrol = _obtener_rol_administrador()
-    except ErrorAplicacion as error:
-        print(f"\n[ERROR] No se pudo preparar los roles: {error}")
-        return 1
-    except Exception as error:  # noqa: BLE001 - se informa al operador y se sale
-        print(f"\n[ERROR] No se pudo conectar con la base de datos: {error}")
-        print("Revise el archivo .env y que el esquema esté cargado.")
-        return 1
+    idrol = _preparar_roles()
+    if idrol is None:
+        return SALIDA_ERROR
 
     if _ya_existe_administrador(idrol):
         print("\nYa existe al menos un usuario administrador. No se creará otro.")
-        return 0
+        return SALIDA_CORRECTA
 
-    datos = _pedir_datos(idrol)
+    return _crear(_pedir_datos(idrol))
+
+
+def _saludar() -> None:
+    """Escribe el encabezado de la herramienta."""
+    print(SEPARADOR)
+    print("  Librería Pablo Antonio Cuadra — Crear usuario administrador")
+    print(SEPARADOR)
+
+
+def _preparar_roles() -> int | None:
+    """
+    Deja creados los roles iniciales y devuelve el de administración.
+
+    Returns:
+        La clave del rol de administración, o None si algo falló. El motivo se
+        escribe en pantalla, que es la única salida que tiene esta herramienta.
+    """
+    try:
+        _asegurar_roles()
+        return _obtener_rol_administrador()
+    except ErrorAplicacion as error:
+        print(f"\n[ERROR] No se pudo preparar los roles: {error}")
+    except Exception as error:  # noqa: BLE001 - se informa al operador y se sale
+        print(f"\n[ERROR] No se pudo conectar con la base de datos: {error}")
+        print("Revise el archivo .env y que el esquema esté cargado.")
+    return None
+
+
+def _crear(datos: dict) -> int:
+    """
+    Da de alta el administrador con los datos ya recogidos.
+
+    Args:
+        datos: Datos del empleado y de su credencial.
+
+    Returns:
+        Código de salida para quien invocó la herramienta.
+    """
     try:
         idusuario = ServicioUsuarios().crear_con_empleado(datos)
     except ErrorAplicacion as error:
         print(f"\n[ERROR] {error}")
-        return 1
+        return SALIDA_ERROR
 
     print(f"\n[LISTO] Usuario «{datos['nombreusuario']}» creado con la clave {idusuario}.")
     print("Ya puede iniciar la aplicación con:  python main.py")
-    return 0
+    return SALIDA_CORRECTA
 
 
 def _asegurar_roles() -> None:

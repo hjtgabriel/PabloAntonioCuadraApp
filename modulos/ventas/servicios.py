@@ -69,26 +69,11 @@ class ServicioVentas:
         efectivo = _a_importe(efectivo_recibido, "El efectivo recibido")
 
         with transaccion(self._conexion) as conexion:
-            productos = ProductoRepositorio(conexion)
-            precios = self._cotizar(productos, lineas)
-            total = sum(
-                (precios[idp] * cant for idp, cant in lineas.items()), Decimal("0")
-            ).quantize(CENTAVO)
+            precios = self._cotizar(ProductoRepositorio(conexion), lineas)
+            total = _sumar(precios, lineas)
+            cambio = _calcular_cambio(efectivo, total)
 
-            if efectivo < total:
-                raise ErrorValidacion(
-                    f"El efectivo recibido (C$ {efectivo:.2f}) es menor que el "
-                    f"total de la venta (C$ {total:.2f})"
-                )
-            cambio = (efectivo - total).quantize(CENTAVO)
-
-            ventas = VentaRepositorio(conexion)
-            inventario = ServicioInventario(conexion)
-            idventa = ventas.registrar_cabecera(idusuario, total, efectivo, cambio)
-
-            for idproducto, cantidad in lineas.items():
-                ventas.registrar_detalle(idventa, idproducto, cantidad, precios[idproducto])
-                inventario.registrar_movimiento(idproducto, TipoMovimiento.VENTA, cantidad)
+            idventa = self._asentar(conexion, idusuario, lineas, precios, total, efectivo, cambio)
 
             logger.info(
                 "Venta %d registrada por el usuario %d: total C$ %s, cambio C$ %s",
@@ -101,6 +86,45 @@ class ServicioVentas:
                 cambio=cambio,
                 lineas=len(lineas),
             )
+
+    @staticmethod
+    def _asentar(
+        conexion: Conexion,
+        idusuario: int,
+        lineas: dict[int, int],
+        precios: dict[int, Decimal],
+        total: Decimal,
+        efectivo: Decimal,
+        cambio: Decimal,
+    ) -> int:
+        """
+        Escribe la venta: cabecera, líneas y salida de inventario.
+
+        Todo ocurre dentro de la transacción que abrió quien llama, así que la
+        venta entra completa o no entra: nunca queda una cabecera sin líneas ni
+        stock descontado sin venta que lo justifique.
+
+        Args:
+            conexion: Conexión de la transacción en curso.
+            idusuario: Usuario que cobra.
+            lineas: Producto → cantidad.
+            precios: Producto → precio unitario pactado.
+            total: Importe total de la venta.
+            efectivo: Efectivo recibido.
+            cambio: Vuelto a entregar.
+
+        Returns:
+            Clave de la venta registrada.
+        """
+        ventas = VentaRepositorio(conexion)
+        inventario = ServicioInventario(conexion)
+        idventa = ventas.registrar_cabecera(idusuario, total, efectivo, cambio)
+
+        for idproducto, cantidad in lineas.items():
+            ventas.registrar_detalle(idventa, idproducto, cantidad, precios[idproducto])
+            inventario.registrar_movimiento(idproducto, TipoMovimiento.VENTA, cantidad)
+
+        return idventa
 
     def listar_recientes(self, limite: int = VENTAS_RECIENTES) -> list[Venta]:
         """
@@ -199,6 +223,43 @@ class ServicioVentas:
                 )
             precios[idproducto] = datos["precioventa"]
         return precios
+
+
+def _sumar(precios: dict[int, Decimal], lineas: dict[int, int]) -> Decimal:
+    """
+    Suma el importe de la venta a partir de los precios ya fijados.
+
+    Args:
+        precios: Producto → precio unitario pactado.
+        lineas: Producto → cantidad.
+
+    Returns:
+        Importe total con dos decimales.
+    """
+    total = sum((precios[idp] * cantidad for idp, cantidad in lineas.items()), Decimal("0"))
+    return total.quantize(CENTAVO)
+
+
+def _calcular_cambio(efectivo: Decimal, total: Decimal) -> Decimal:
+    """
+    Comprueba que el efectivo alcance y devuelve el vuelto (RF10).
+
+    Args:
+        efectivo: Efectivo entregado por el cliente.
+        total: Importe total de la venta.
+
+    Returns:
+        El cambio a entregar, con dos decimales.
+
+    Raises:
+        ErrorValidacion: Si el efectivo no cubre el total.
+    """
+    if efectivo < total:
+        raise ErrorValidacion(
+            f"El efectivo recibido (C$ {efectivo:.2f}) es menor que el "
+            f"total de la venta (C$ {total:.2f})"
+        )
+    return (efectivo - total).quantize(CENTAVO)
 
 
 def _validar_articulos(articulos: list[dict]) -> dict[int, int]:

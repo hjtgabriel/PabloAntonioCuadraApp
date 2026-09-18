@@ -76,14 +76,7 @@ class ServicioInventario:
             delta = self._calcular_delta(movimiento, cantidad_valida, actual)
             stock_final = actual.stock + delta
 
-            if delta < 0:
-                if not productos.descontar_stock(idproducto, -delta):
-                    raise ErrorStockInsuficiente(
-                        f"No hay existencias suficientes de «{actual.descripcion}»: "
-                        f"hay {actual.stock} y se intentan retirar {abs(delta)}"
-                    )
-            elif delta > 0:
-                productos.ajustar_stock(idproducto, delta)
+            self._aplicar_al_stock(productos, actual, delta)
             inventario.anotar(idproducto, movimiento.value, cantidad_valida)
 
             logger.info(
@@ -115,6 +108,38 @@ class ServicioInventario:
             Productos con existencias críticas, del más escaso al menos escaso.
         """
         return self._productos.listar_bajo_minimo()
+
+    @staticmethod
+    def _aplicar_al_stock(
+        productos: ProductoRepositorio, producto: Producto, delta: int
+    ) -> None:
+        """
+        Suma o resta las unidades al stock del producto.
+
+        Restar se hace con un descuento condicional y no leyendo primero: la
+        comprobación viaja dentro del ``UPDATE`` para que dos ventas
+        simultáneas de la última unidad no pasen las dos.
+
+        Args:
+            productos: Repositorio atado a la transacción en curso.
+            producto: Producto tal como estaba antes del movimiento.
+            delta: Unidades a sumar; negativo para descontar.
+
+        Raises:
+            ErrorStockInsuficiente: Si no hay existencias para el descuento.
+        """
+        if delta == 0:
+            return
+
+        if delta > 0:
+            productos.ajustar_stock(producto.idproducto, delta)
+            return
+
+        if not productos.descontar_stock(producto.idproducto, -delta):
+            raise ErrorStockInsuficiente(
+                f"No hay existencias suficientes de «{producto.descripcion}»: "
+                f"hay {producto.stock} y se intentan retirar {abs(delta)}"
+            )
 
     @staticmethod
     def _calcular_delta(tipo: TipoMovimiento, cantidad: int, producto: Producto) -> int:

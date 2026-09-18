@@ -452,27 +452,22 @@ def motor_futuro():
     configurar_motor(None)
 
 
-def test_la_aplicacion_entera_corre_sobre_un_motor_nuevo(motor_futuro):
+@pytest.fixture
+def negocio_en_motor_nuevo(motor_futuro):
     """
-    Migrar de base de datos debe costar dos clases y nada más.
+    Deja un negocio en marcha sobre el motor recién inventado.
 
-    Esta prueba recorre el negocio completo —acceso, catálogo, búsqueda,
-    filtros, inventario, venta, factura y reportes— sobre un motor que no
-    existía al escribir ninguno de esos módulos. Si alguien ata una consulta a
-    PostgreSQL, aquí se nota.
+    Crea usuario, producto y una venta ya cobrada, para que cada prueba
+    compruebe una sola cosa y diga con claridad qué se rompió.
+
+    Returns:
+        Diccionario con las claves creadas y los servicios listos.
     """
     from decimal import Decimal
 
-    from modulos.auth.servicios import ServicioAutenticacion
-    from modulos.inventario.servicios import ServicioInventario
     from modulos.personal.servicios import ServicioUsuarios
-    from modulos.productos.modelos import FiltroCatalogo
     from modulos.productos.servicios import ServicioProductos
-    from modulos.reportes.servicios import ServicioReportes
-    from modulos.ventas.factura import componer_html
     from modulos.ventas.servicios import ServicioVentas
-
-    assert motor_futuro.dialecto.nombre == "futuro"
 
     idusuario = ServicioUsuarios().crear_con_empleado(
         {
@@ -483,11 +478,7 @@ def test_la_aplicacion_entera_corre_sobre_un_motor_nuevo(motor_futuro):
             "idrol": 1,
         }
     )
-    sesion = ServicioAutenticacion().iniciar_sesion("ana", "clave-segura-1")
-    assert sesion.es_administrador is True
-
-    productos = ServicioProductos()
-    idproducto = productos.crear(
+    idproducto = ServicioProductos().crear(
         {
             "descripcion": "Cuaderno Universitario",
             "idcategoria": 1,
@@ -499,23 +490,80 @@ def test_la_aplicacion_entera_corre_sobre_un_motor_nuevo(motor_futuro):
             "stockminimo": 2,
         }
     )
-    assert len(productos.listar("cuaderno")) == 1
-    assert len(productos.listar(filtro=FiltroCatalogo(idmarca=1))) == 1
-
-    ServicioInventario().registrar_movimiento(idproducto, "Entrada", 5)
-    assert productos.obtener(idproducto).stock == 15
-
-    ventas = ServicioVentas()
-    comprobante = ventas.registrar(
+    comprobante = ServicioVentas().registrar(
         idusuario, [{"idproducto": idproducto, "cantidad": 2}], "500.00"
     )
+    return {"idusuario": idusuario, "idproducto": idproducto, "venta": comprobante.idventa}
 
-    productos.actualizar(idproducto, {"precioventa": Decimal("999.00")})
-    venta = ventas.obtener_detalle(comprobante.idventa)
+
+def test_el_motor_nuevo_es_el_que_esta_activo(motor_futuro):
+    """La prueba no sirve de nada si en realidad se está usando SQLite."""
+    assert motor_futuro.dialecto.nombre == "futuro"
+
+
+def test_el_acceso_funciona_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """Autenticar toca el repositorio de usuarios y la marca de rol."""
+    from modulos.auth.servicios import ServicioAutenticacion
+
+    assert ServicioAutenticacion().iniciar_sesion("ana", "clave-segura-1").es_administrador
+
+
+def test_la_busqueda_de_texto_funciona_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """Es la consulta que cada motor escribe distinto: ILIKE, UPPER, LOWER."""
+    from modulos.productos.servicios import ServicioProductos
+
+    assert len(ServicioProductos().listar("cuaderno")) == 1
+
+
+def test_los_filtros_funcionan_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """El filtro compone condiciones sobre la marcha (RF08)."""
+    from modulos.productos.modelos import FiltroCatalogo
+    from modulos.productos.servicios import ServicioProductos
+
+    assert len(ServicioProductos().listar(filtro=FiltroCatalogo(idmarca=1))) == 1
+
+
+def test_el_inventario_funciona_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """Mover stock usa el descuento condicional y la fecha del servidor."""
+    from modulos.inventario.servicios import ServicioInventario
+    from modulos.productos.servicios import ServicioProductos
+
+    idproducto = negocio_en_motor_nuevo["idproducto"]
+    ServicioInventario().registrar_movimiento(idproducto, "Entrada", 5)
+
+    assert ServicioProductos().obtener(idproducto).stock == 13
+
+
+def test_la_venta_cuadra_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """El precio pactado se guarda igual en cualquier motor."""
+    from decimal import Decimal
+
+    from modulos.productos.servicios import ServicioProductos
+    from modulos.ventas.servicios import ServicioVentas
+
+    ServicioProductos().actualizar(
+        negocio_en_motor_nuevo["idproducto"], {"precioventa": Decimal("999.00")}
+    )
+    venta = ServicioVentas().obtener_detalle(negocio_en_motor_nuevo["venta"])
+
     assert sum(linea.subtotal for linea in venta.detalles) == venta.totalventa
+
+
+def test_la_factura_se_compone_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """Componer la factura depende de los tipos que devuelve cada driver."""
+    from modulos.ventas.factura import componer_html
+    from modulos.ventas.servicios import ServicioVentas
+
+    venta = ServicioVentas().obtener_detalle(negocio_en_motor_nuevo["venta"])
 
     assert componer_html(venta, "Librería Pablo Antonio Cuadra", 80).startswith("<!DOCTYPE")
 
+
+def test_los_reportes_funcionan_en_un_motor_nuevo(negocio_en_motor_nuevo):
+    """Los reportes agrupan por fecha, que es lo que más difiere entre motores."""
+    from modulos.reportes.servicios import ServicioReportes
+
     reportes = ServicioReportes()
+
     assert reportes.ventas_semanales() != []
     assert reportes.articulos_mas_vendidos() != []

@@ -16,31 +16,13 @@ import pathlib
 import flet as ft
 
 from nucleo.errores import ErrorConexion
+from tests.conftest import PaginaFalsa
 from vistas.componentes.notificaciones import MENSAJE_INESPERADO, avisar_fallo_inesperado
 
 FUGA = (
     'connection to server at "192.168.0.7", port 5432 failed: FATAL: '
     'password authentication failed for user "postgres"'
 )
-
-
-class PaginaFalsa:
-    """Página que guarda lo que se le pide mostrar."""
-
-    def __init__(self) -> None:
-        """Arranca sin avisos registrados."""
-        self.dialogos_mostrados: list = []
-
-    def show_dialog(self, dialogo) -> None:
-        """Registra el aviso en lugar de dibujarlo."""
-        self.dialogos_mostrados.append(dialogo)
-
-    def pop_dialog(self):
-        """Descarta el último aviso."""
-        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
-
-    def update(self) -> None:
-        """No hay ventana que refrescar."""
 
 
 def texto_mostrado(pagina: PaginaFalsa) -> str:

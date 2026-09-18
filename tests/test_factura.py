@@ -19,6 +19,7 @@ from modulos.ventas.factura import alto_mm, componer_html, nombre_archivo
 from modulos.ventas.modelos import DetalleVenta, Venta
 from modulos.ventas.servicios import ServicioVentas
 from nucleo.documentos import ErrorDocumento, guardar
+from tests.conftest import PaginaFalsa, textos_visibles
 
 NEGOCIO = "Librería Pablo Antonio Cuadra"
 
@@ -235,63 +236,12 @@ def test_la_factura_de_una_venta_real_cuadra(producto_demo, usuario_admin):
 # ── Diálogo de la factura en pantalla ───────────────────────────────────
 
 
-class PaginaFalsa:
-    """Sustituto de ``ft.Page`` para construir el diálogo sin ventana."""
-
-    def __init__(self) -> None:
-        """Arranca sin diálogos mostrados."""
-        self.dialogos_mostrados: list = []
-
-    def show_dialog(self, dialogo) -> None:
-        """Registra el diálogo en lugar de dibujarlo."""
-        self.dialogos_mostrados.append(dialogo)
-
-    def pop_dialog(self):
-        """Descarta el último diálogo registrado."""
-        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
-
-    def update(self) -> None:
-        """No hay ventana que refrescar."""
-
-
-def textos_de(control) -> list[str]:
-    """
-    Recoge todos los textos visibles de un árbol de controles.
-
-    Args:
-        control: Control raíz a recorrer.
-
-    Returns:
-        Los textos encontrados, en orden de aparición.
-    """
-    import flet as ft
-
-    encontrados: list[str] = []
-    pendientes = [control]
-    vistos: set[int] = set()
-    while pendientes:
-        nodo = pendientes.pop(0)
-        if id(nodo) in vistos:
-            continue
-        vistos.add(id(nodo))
-        if isinstance(nodo, ft.Text) and isinstance(nodo.value, str):
-            encontrados.append(nodo.value)
-        for atributo in ("controls", "content", "actions", "title"):
-            hijo = getattr(nodo, atributo, None)
-            if hijo is None:
-                continue
-            for elemento in hijo if isinstance(hijo, list) else [hijo]:
-                if isinstance(elemento, ft.Control):
-                    pendientes.append(elemento)
-    return encontrados
-
-
 def test_el_dialogo_muestra_el_detalle_y_no_solo_los_totales():
     """El cliente revisa los artículos antes de llevarse el comprobante."""
     from vistas.ventas import _factura
 
     dialogo = _factura(PaginaFalsa(), venta_de_prueba(), lambda _venta: None)
-    textos = " ".join(textos_de(dialogo))
+    textos = " ".join(textos_visibles(dialogo))
 
     assert "Cuaderno universitario" in textos
     assert "Folder Manila" in textos

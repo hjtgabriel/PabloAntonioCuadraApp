@@ -17,6 +17,7 @@ import flet as ft
 import pytest
 
 from modulos.ventas.servicios import ServicioVentas
+from tests.conftest import PaginaFalsa
 from vistas.catalogos import pantalla_categorias, pantalla_marcas, pantalla_roles
 from vistas.componentes.campos import campo_decimal, campo_entero, campo_seleccion, campo_texto
 from vistas.componentes.dialogos import Campo, DialogoConfirmacion, DialogoFormulario
@@ -32,34 +33,6 @@ from vistas.reportes import pantalla_reportes
 from vistas.ventas import pantalla_ventas
 
 
-class PaginaFalsa:
-    """
-    Sustituto de ``ft.Page`` para construir pantallas fuera de una ventana real.
-
-    Registra los diálogos que se le piden mostrar, de modo que las pruebas
-    puedan comprobar que una acción abre el diálogo esperado.
-    """
-
-    def __init__(self) -> None:
-        """Arranca sin controles, sin diálogos y sin refrescos contados."""
-        self.controls: list = []
-        self.dialogos_mostrados: list = []
-        self.actualizaciones = 0
-
-    def show_dialog(self, dialogo) -> None:
-        """Registra el diálogo en lugar de dibujarlo."""
-        self.dialogos_mostrados.append(dialogo)
-
-    def pop_dialog(self):
-        """Descarta el último diálogo registrado."""
-        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
-
-    def update(self) -> None:
-        """Cuenta las peticiones de refresco."""
-        self.actualizaciones += 1
-
-
-@pytest.fixture
 def pagina() -> PaginaFalsa:
     """Entrega una página falsa lista para construir pantallas."""
     return PaginaFalsa()

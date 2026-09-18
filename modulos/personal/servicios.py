@@ -241,14 +241,9 @@ class ServicioUsuarios:
 
         with transaccion(self._conexion) as conexion:
             usuarios = UsuarioRepositorio(conexion)
-            empleados = EmpleadoRepositorio(conexion)
-
-            if empleados.buscar_por_id(idempleado) is None:
-                raise ErrorNoEncontrado("No se encontró el empleado seleccionado")
-            if empleados.obtener_idusuario(idempleado) is not None:
-                raise ErrorDuplicado("Ese empleado ya tiene un usuario asignado")
-            if usuarios.existe_nombre_usuario(nombreusuario):
-                raise ErrorDuplicado(f"El usuario «{nombreusuario}» ya existe")
+            self._comprobar_que_puede_recibir_credencial(
+                conexion, idempleado, nombreusuario
+            )
 
             return usuarios.insertar(
                 Usuario(
@@ -259,6 +254,32 @@ class ServicioUsuarios:
                     contrasena=cifrar_contrasena(contrasena),
                 )
             )
+
+    @staticmethod
+    def _comprobar_que_puede_recibir_credencial(
+        conexion: Conexion, idempleado: int, nombreusuario: str
+    ) -> None:
+        """
+        Verifica que se pueda dar acceso a ese empleado con ese identificador.
+
+        Args:
+            conexion: Conexión de la transacción en curso.
+            idempleado: Empleado al que se dará acceso.
+            nombreusuario: Identificador de acceso solicitado.
+
+        Raises:
+            ErrorNoEncontrado: Si el empleado no existe.
+            ErrorDuplicado: Si ya tiene credencial, o si el identificador está
+                tomado por otro.
+        """
+        empleados = EmpleadoRepositorio(conexion)
+
+        if empleados.buscar_por_id(idempleado) is None:
+            raise ErrorNoEncontrado("No se encontró el empleado seleccionado")
+        if empleados.obtener_idusuario(idempleado) is not None:
+            raise ErrorDuplicado("Ese empleado ya tiene un usuario asignado")
+        if UsuarioRepositorio(conexion).existe_nombre_usuario(nombreusuario):
+            raise ErrorDuplicado(f"El usuario «{nombreusuario}» ya existe")
 
     def actualizar(self, idusuario: int, datos: dict) -> bool:
         """

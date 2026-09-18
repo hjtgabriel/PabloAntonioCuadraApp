@@ -154,48 +154,71 @@ class DialogoFormulario(DialogoBase):
         self._al_guardar = al_guardar
         self._error = ft.Text("", size=12, color=ERROR, visible=False)
 
-        contenido = ft.Column(
-            [
-                ft.Text(titulo, size=TEXTO_SUBTITULO, weight=ft.FontWeight.BOLD, color=TEXTO),
-                self._error,
-                ft.Column(
-                    [campo.control for campo in campos],
-                    spacing=ESPACIO,
-                    tight=True,
-                    scroll=ft.ScrollMode.AUTO,
-                ),
-            ],
-            tight=True,
-            spacing=ESPACIO,
-            width=ANCHO_FORMULARIO,
-        )
-
         super().__init__(
             modal=True,
-            content=ft.Container(
-                contenido,
-                padding=ESPACIO_GRANDE,
-                bgcolor=SUPERFICIE,
-                border_radius=RADIO_TARJETA,
-            ),
-            actions=[
-                ft.TextButton(
-                    "Cancelar",
-                    icon=ft.Icons.CLOSE,
-                    on_click=self.cerrar,
-                    style=ft.ButtonStyle(color=TEXTO),
-                ),
-                ft.Button(
-                    texto_guardar,
-                    icon=ft.Icons.SAVE,
-                    on_click=self._al_confirmar,
-                    bgcolor=ACENTO,
-                    color=SUPERFICIE,
-                    style=estilo_boton(),
-                ),
-            ],
+            content=self._cuerpo(titulo, campos),
+            actions=self._botones(texto_guardar),
             actions_alignment=ft.MainAxisAlignment.END,
         )
+
+    def _cuerpo(self, titulo: str, campos: list[Campo]) -> ft.Container:
+        """
+        Arma el contenido del diálogo: título, aviso de error y campos.
+
+        Args:
+            titulo: Encabezado del diálogo.
+            campos: Campos del formulario, en orden de aparición.
+
+        Returns:
+            El contenido listo para el diálogo.
+        """
+        return ft.Container(
+            ft.Column(
+                [
+                    ft.Text(titulo, size=TEXTO_SUBTITULO, weight=ft.FontWeight.BOLD, color=TEXTO),
+                    self._error,
+                    ft.Column(
+                        [campo.control for campo in campos],
+                        spacing=ESPACIO,
+                        tight=True,
+                        scroll=ft.ScrollMode.AUTO,
+                    ),
+                ],
+                tight=True,
+                spacing=ESPACIO,
+                width=ANCHO_FORMULARIO,
+            ),
+            padding=ESPACIO_GRANDE,
+            bgcolor=SUPERFICIE,
+            border_radius=RADIO_TARJETA,
+        )
+
+    def _botones(self, texto_guardar: str) -> list[ft.Control]:
+        """
+        Arma los botones de cancelar y guardar.
+
+        Args:
+            texto_guardar: Rótulo del botón de confirmación.
+
+        Returns:
+            Los botones del diálogo, en orden.
+        """
+        return [
+            ft.TextButton(
+                "Cancelar",
+                icon=ft.Icons.CLOSE,
+                on_click=self.cerrar,
+                style=ft.ButtonStyle(color=TEXTO),
+            ),
+            ft.Button(
+                texto_guardar,
+                icon=ft.Icons.SAVE,
+                on_click=self._al_confirmar,
+                bgcolor=ACENTO,
+                color=SUPERFICIE,
+                style=estilo_boton(),
+            ),
+        ]
 
     def _al_confirmar(self, _evento: ft.ControlEvent) -> None:
         """Valida el formulario y, si está completo, entrega los datos y cierra."""

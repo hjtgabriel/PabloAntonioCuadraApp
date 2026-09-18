@@ -14,6 +14,33 @@ from vistas.crud import ConfiguracionCrud, construir_pantalla_crud
 LONGITUD_MINIMA_NOMBRE = 2
 
 
+def _campos_proveedor(registro: object | None) -> list[Campo]:
+    """
+    Arma el formulario de proveedor, precargado si se está editando.
+
+    Args:
+        registro: Proveedor a editar, o None si es un alta.
+
+    Returns:
+        Los campos del formulario, en orden de aparición.
+    """
+    valor = lector_de_texto(registro)
+    return [
+        definir_campo(
+            "nombreproveedor",
+            "Nombre del proveedor",
+            obligatorio=True,
+            valor=valor("nombreproveedor"),
+            icono=ft.Icons.LOCAL_SHIPPING,
+            validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "El nombre"),
+        ),
+        definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+        definir_campo(
+            "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
+        ),
+    ]
+
+
 def pantalla_proveedores(pagina: ft.Page) -> ft.Control:
     """
     Arma la pantalla de proveedores.
@@ -25,24 +52,6 @@ def pantalla_proveedores(pagina: ft.Page) -> ft.Control:
         El control raíz de la pantalla.
     """
     servicio = ServicioProveedores()
-
-    def construir_campos(registro: object | None) -> list[Campo]:
-        """Arma el formulario, precargado si se está editando."""
-        valor = lector_de_texto(registro)
-        return [
-            definir_campo(
-                "nombreproveedor",
-                "Nombre del proveedor",
-                obligatorio=True,
-                valor=valor("nombreproveedor"),
-                icono=ft.Icons.LOCAL_SHIPPING,
-                validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "El nombre"),
-            ),
-            definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
-            definir_campo(
-                "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
-            ),
-        ]
 
     return construir_pantalla_crud(
         pagina,
@@ -56,7 +65,7 @@ def pantalla_proveedores(pagina: ft.Page) -> ft.Control:
                 Columna("telefono", "Teléfono", formato=lambda valor: valor or "—"),
                 Columna("direccion", "Dirección", formato=lambda valor: valor or "—"),
             ],
-            construir_campos=construir_campos,
+            construir_campos=_campos_proveedor,
             listar=servicio.listar,
             crear=lambda datos: servicio.crear(
                 datos["nombreproveedor"], datos["telefono"], datos["direccion"]

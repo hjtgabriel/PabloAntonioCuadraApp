@@ -21,6 +21,7 @@ from modulos.personal.servicios import ServicioEmpleados, ServicioUsuarios
 from modulos.productos.servicios import ServicioProductos
 from modulos.proveedores.servicios import ServicioProveedores
 from nucleo.errores import ErrorValidacion
+from tests.conftest import PaginaFalsa
 from vistas.componentes.campos import campo_seleccion
 from vistas.componentes.dialogos import Campo, definir_campo
 from vistas.componentes.registros import lector, lector_de_texto, leer_valor
@@ -265,7 +266,7 @@ def constructor_de_campos(modulo, pantalla):
 
     modulo.construir_pantalla_crud = espia
     try:
-        pantalla(PaginaMinima())
+        pantalla(PaginaFalsa())
     finally:
         modulo.construir_pantalla_crud = original
     return capturado["campos"]
@@ -402,23 +403,4 @@ def test_formulario_de_catalogo_usa_la_columna_del_servicio(base_datos):
     construir_marcas = constructor_de_campos(catalogos, catalogos.pantalla_marcas)
     assert claves(construir_marcas(None)) == ["nombremarca"]
 
-
-class PaginaMinima:
-    """Página falsa suficiente para construir una pantalla en las pruebas."""
-
-    def __init__(self) -> None:
-        """Arranca con las listas que las pantallas esperan en la página."""
-        self.controls: list = []
-        self.dialogos_mostrados: list = []
-
-    def show_dialog(self, dialogo) -> None:
-        """Registra el diálogo en lugar de dibujarlo."""
-        self.dialogos_mostrados.append(dialogo)
-
-    def pop_dialog(self):
-        """Descarta el último diálogo registrado."""
-        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
-
-    def update(self) -> None:
-        """No hay ventana que refrescar."""
 

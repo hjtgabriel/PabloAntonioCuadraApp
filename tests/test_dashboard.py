@@ -14,6 +14,7 @@ import flet as ft
 import pytest
 
 from modulos.personal.modelos import UsuarioAutenticado
+from tests.conftest import PaginaFalsa
 from vistas.dashboard import (
     AYUDA_MOSTRAR_MENU,
     AYUDA_OCULTAR_MENU,
@@ -22,28 +23,6 @@ from vistas.dashboard import (
     _resumen_alertas,
     pantalla_dashboard,
 )
-
-
-class PaginaFalsa:
-    """Sustituto de ``ft.Page`` para construir el panel fuera de una ventana."""
-
-    def __init__(self) -> None:
-        """Arranca con las listas que el panel espera encontrar en la página."""
-        self.controls: list = []
-        self.dialogos_mostrados: list = []
-        self.avisos: list = []
-        self.overlay: list = []
-
-    def show_dialog(self, dialogo) -> None:
-        """Registra el diálogo en lugar de dibujarlo."""
-        self.dialogos_mostrados.append(dialogo)
-
-    def pop_dialog(self):
-        """Descarta el último diálogo registrado."""
-        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
-
-    def update(self) -> None:
-        """No hay ventana que refrescar."""
 
 
 def sesion(rol: str, administra: bool | None = None) -> UsuarioAutenticado:
@@ -73,7 +52,6 @@ def sesion(rol: str, administra: bool | None = None) -> UsuarioAutenticado:
     )
 
 
-@pytest.fixture
 def pagina() -> PaginaFalsa:
     """Entrega una página falsa lista para construir el panel."""
     return PaginaFalsa()

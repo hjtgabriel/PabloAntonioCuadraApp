@@ -162,3 +162,104 @@ def producto_demo(base_datos) -> int:
             "stockminimo": 5,
         }
     )
+
+
+class PaginaFalsa:
+    """
+    Sustituto de ``ft.Page`` para construir pantallas fuera de una ventana.
+
+    Estaba copiada en cinco archivos de prueba con variaciones mínimas. Vive
+    aquí una sola vez porque lo que necesita una prueba de interfaz es siempre
+    lo mismo: registrar los diálogos que se le piden mostrar y contar los
+    refrescos, sin dibujar nada.
+    """
+
+    def __init__(self) -> None:
+        """Arranca sin controles, sin diálogos y sin refrescos contados."""
+        self.controls: list = []
+        self.dialogos_mostrados: list = []
+        self.overlay: list = []
+        self.actualizaciones = 0
+
+    def show_dialog(self, dialogo) -> None:
+        """
+        Registra el diálogo en lugar de dibujarlo.
+
+        Args:
+            dialogo: Diálogo que la pantalla quiso mostrar.
+        """
+        self.dialogos_mostrados.append(dialogo)
+
+    def pop_dialog(self):
+        """
+        Descarta el último diálogo registrado.
+
+        Returns:
+            El diálogo cerrado, o None si no había ninguno.
+        """
+        return self.dialogos_mostrados.pop() if self.dialogos_mostrados else None
+
+    def update(self) -> None:
+        """Cuenta la petición de refresco; no hay ventana que redibujar."""
+        self.actualizaciones += 1
+
+
+def textos_visibles(control) -> list[str]:
+    """
+    Recoge todos los textos de un árbol de controles de Flet.
+
+    Args:
+        control: Control raíz a recorrer.
+
+    Returns:
+        Los textos encontrados, en orden de aparición.
+    """
+    import flet as ft
+
+    encontrados: list[str] = []
+    pendientes = [control]
+    vistos: set[int] = set()
+
+    while pendientes:
+        nodo = pendientes.pop(0)
+        if id(nodo) in vistos:
+            continue
+        vistos.add(id(nodo))
+        if isinstance(nodo, ft.Text) and isinstance(nodo.value, str):
+            encontrados.append(nodo.value)
+        pendientes.extend(_hijos_de(nodo))
+
+    return encontrados
+
+
+def _hijos_de(nodo) -> list:
+    """
+    Devuelve los controles que cuelgan de otro.
+
+    Args:
+        nodo: Control a inspeccionar.
+
+    Returns:
+        Sus controles hijos, mirando los atributos donde Flet los guarda.
+    """
+    import flet as ft
+
+    hijos = []
+    for atributo in ("controls", "content", "actions", "title"):
+        valor = getattr(nodo, atributo, None)
+        if valor is None:
+            continue
+        candidatos = valor if isinstance(valor, list) else [valor]
+        hijos.extend(c for c in candidatos if isinstance(c, ft.Control))
+    return hijos
+
+
+@pytest.fixture
+def pagina() -> PaginaFalsa:
+    """
+    Entrega una página falsa lista para construir pantallas.
+
+    Returns:
+        La página sustituta.
+    """
+    return PaginaFalsa()
