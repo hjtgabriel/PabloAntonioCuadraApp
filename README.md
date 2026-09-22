@@ -105,6 +105,22 @@ cual.
 - *«El efectivo recibido es menor que el total»*: revise el monto escrito.
 - *«El carrito está vacío»*: agregue al menos un producto antes de cobrar.
 
+### 2.2. Validaciones al escribir
+
+Los campos avisan en el momento, debajo del propio campo y en rojo:
+
+- **Efectivo recibido.** Solo admite números positivos. Si escribe letras o un
+  importe negativo, aparece «Formato inválido: solo números positivos». El
+  campo deja escribir para poder explicar qué está mal: bloquear la tecla en
+  silencio no le dice al cajero por qué no pasa nada.
+- **Teléfono** (empleados, usuarios y proveedores). Solo admite dígitos, entre
+  7 y 15. Si escribe letras, guiones, espacios o paréntesis, aparece «Solo
+  números: sin letras, guiones ni símbolos». Guardar todos los teléfonos con
+  el mismo formato es lo que permite buscarlos después.
+
+> Si tiene teléfonos antiguos escritos con guiones, al editar ese registro el
+> campo los marcará. Quite el guion y guarde: el número queda normalizado.
+
 ### 2.2.1. La factura
 
 Al cobrar aparece la factura de la venta, con cada artículo, su precio y su

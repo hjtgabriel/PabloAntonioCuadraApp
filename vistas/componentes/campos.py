@@ -18,11 +18,22 @@ from decimal import Decimal, InvalidOperation
 import flet as ft
 
 from tema import ACENTO, BORDE, SUPERFICIE, TEXTO_NORMAL
+from vistas.componentes.refresco import refrescar
 
 Validador = Callable[[str], str | None]
 """Función que recibe el valor y devuelve un mensaje de error, o None si está bien."""
 
 PATRON_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+PATRON_SOLO_DIGITOS = re.compile(r"^\d+$")
+
+# Los avisos van debajo del campo, que en el punto de venta mide unos 300 px.
+# Un texto más largo se corta con puntos suspensivos y deja al usuario sin
+# saber qué corregir, así que se redactan cortos a propósito.
+
+MENSAJE_SOLO_NUMEROS_POSITIVOS = "Formato inválido: solo números positivos"
+MENSAJE_SOLO_DIGITOS = "Solo números: sin letras, guiones ni símbolos"
+LONGITUD_MINIMA_TELEFONO = 7
+LONGITUD_MAXIMA_TELEFONO = 15
 
 
 def campo_texto(
@@ -98,6 +109,7 @@ def campo_decimal(
     valor: object = "0.00",
     minimo: Decimal = Decimal("0"),
     icono: str = ft.Icons.ATTACH_MONEY,
+    filtrar_entrada: bool = True,
 ) -> ft.TextField:
     """
     Crea un campo para importes monetarios.
@@ -108,18 +120,25 @@ def campo_decimal(
         valor: Valor inicial.
         minimo: Importe mínimo aceptado.
         icono: Icono a mostrar al inicio del campo.
+        filtrar_entrada: Si se impide teclear caracteres que no sean cifras.
+            Desactivarlo deja escribir cualquier cosa para que el validador
+            pueda explicar qué está mal: bloquear la tecla en silencio no le
+            dice al usuario por qué no pasa nada al escribir.
 
     Returns:
         El campo listo para agregar a un formulario.
     """
+    extras: dict[str, object] = {"keyboard_type": ft.KeyboardType.NUMBER}
+    if filtrar_entrada:
+        extras["input_filter"] = ft.InputFilter(regex_string=r"^[0-9]*\.?[0-9]*$")
+
     return campo_texto(
         etiqueta,
         obligatorio=obligatorio,
         valor=str(valor),
         icono=icono,
         validador=_validador_decimal(obligatorio, minimo),
-        keyboard_type=ft.KeyboardType.NUMBER,
-        input_filter=ft.InputFilter(regex_string=r"^[0-9]*\.?[0-9]*$"),
+        **extras,
     )
 
 
@@ -174,6 +193,37 @@ def campo_fecha(etiqueta: str, *, obligatorio: bool = False, valor: str = "") ->
         icono=ft.Icons.CALENDAR_TODAY,
         validador=_validador_fecha(obligatorio),
         keyboard_type=ft.KeyboardType.DATETIME,
+    )
+
+
+def campo_telefono(
+    etiqueta: str = "Teléfono",
+    *,
+    obligatorio: bool = False,
+    valor: str = "",
+) -> ft.TextField:
+    """
+    Crea un campo de teléfono que solo admite dígitos.
+
+    El teclado numérico se sugiere, pero la validación no se apoya en él: un
+    teclado es una comodidad y no una garantía, porque el texto puede llegar
+    pegado desde el portapapeles.
+
+    Args:
+        etiqueta: Rótulo del campo.
+        obligatorio: Si el campo no puede quedar vacío.
+        valor: Valor inicial.
+
+    Returns:
+        El campo listo para agregar a un formulario.
+    """
+    return campo_texto(
+        etiqueta,
+        obligatorio=obligatorio,
+        valor=valor,
+        icono=ft.Icons.PHONE,
+        validador=_validador_telefono(obligatorio),
+        keyboard_type=ft.KeyboardType.PHONE,
     )
 
 
@@ -290,9 +340,50 @@ def _validador_decimal(obligatorio: bool, minimo: Decimal) -> Validador:
         try:
             importe = Decimal(texto)
         except InvalidOperation:
-            return "Debe ser un número válido"
+            return MENSAJE_SOLO_NUMEROS_POSITIVOS
+        if importe < 0:
+            return MENSAJE_SOLO_NUMEROS_POSITIVOS
         if importe < minimo:
             return f"No puede ser menor que {minimo}"
+        return None
+
+    return validar
+
+
+def _validador_telefono(obligatorio: bool) -> Validador:
+    """
+    Construye el validador de un número de teléfono.
+
+    Exige dígitos y nada más. Un guion o un espacio parecen inofensivos, pero
+    el teléfono se guarda tal como se escribe y después nadie puede buscarlo ni
+    marcarlo de forma fiable si cada quien lo anota a su manera.
+
+    Args:
+        obligatorio: Si el campo no puede quedar vacío.
+
+    Returns:
+        Validador listo para pasar a un campo.
+    """
+
+    def validar(valor: str) -> str | None:
+        """
+        Comprueba que el texto sean solo dígitos y de un largo razonable.
+
+        Args:
+            valor: Texto escrito en el campo.
+
+        Returns:
+            El mensaje de error, o None si el teléfono es aceptable.
+        """
+        texto = (valor or "").strip()
+        if not texto:
+            return "Este campo es obligatorio" if obligatorio else None
+        if not PATRON_SOLO_DIGITOS.match(texto):
+            return MENSAJE_SOLO_DIGITOS
+        if len(texto) < LONGITUD_MINIMA_TELEFONO:
+            return f"El teléfono debe tener al menos {LONGITUD_MINIMA_TELEFONO} dígitos"
+        if len(texto) > LONGITUD_MAXIMA_TELEFONO:
+            return f"El teléfono no puede pasar de {LONGITUD_MAXIMA_TELEFONO} dígitos"
         return None
 
     return validar
@@ -366,6 +457,36 @@ def _validador_fecha(obligatorio: bool) -> Validador:
 # ── Apoyo interno ───────────────────────────────────────────────────────
 
 
+def encadenar_al_cambiar(campo: ft.TextField, manejador: Callable) -> None:
+    """
+    Añade un manejador al evento de cambio sin descartar el que ya tenía.
+
+    Asignar ``campo.on_change`` directamente **reemplaza** lo que hubiera, y
+    los campos con validación traen ahí su comprobación. Así se perdía: el
+    campo de efectivo del punto de venta tenía validador, pero la pantalla lo
+    sobreescribía al conectar el cálculo del cambio, de modo que nunca llegaba
+    a avisar de nada.
+
+    Args:
+        campo: Campo al que añadir el manejador.
+        manejador: Función a ejecutar además de lo que ya hubiera.
+    """
+    anterior = campo.on_change
+
+    def ambos(evento: ft.ControlEvent) -> None:
+        """
+        Ejecuta primero lo que ya estaba y después lo nuevo.
+
+        Args:
+            evento: Evento de cambio que entrega Flet.
+        """
+        if anterior is not None:
+            anterior(evento)
+        manejador(evento)
+
+    campo.on_change = ambos
+
+
 def _rotulo(etiqueta: str, obligatorio: bool) -> str:
     """
     Compone el rótulo del campo, marcando los obligatorios con un asterisco.
@@ -398,6 +519,6 @@ def _conectar_validador(campo: ft.TextField, validador: Validador) -> None:
         """
         control = evento.control
         control.error = validador(control.value or "")
-        control.update()
+        refrescar(control)
 
     campo.on_change = al_escribir

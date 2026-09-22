@@ -16,6 +16,7 @@ from nucleo.errores import ErrorValidacion
 from vistas.componentes.campos import (
     campo_contrasena,
     campo_seleccion,
+    campo_telefono,
     longitud_minima,
 )
 from vistas.componentes.dialogos import Campo, definir_campo
@@ -59,7 +60,7 @@ def _campos_persona(registro: object | None) -> list[Campo]:
         definir_campo(
             "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
         ),
-        definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+        definir_campo("telefono", "Teléfono", campo_telefono, valor=valor("telefono")),
     ]
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import flet as ft
 
 from modulos.proveedores.servicios import ServicioProveedores
-from vistas.componentes.campos import longitud_minima
+from vistas.componentes.campos import campo_telefono, longitud_minima
 from vistas.componentes.dialogos import Campo, definir_campo
 from vistas.componentes.registros import lector_de_texto
 from vistas.componentes.tablas import Columna
@@ -34,7 +34,7 @@ def _campos_proveedor(registro: object | None) -> list[Campo]:
             icono=ft.Icons.LOCAL_SHIPPING,
             validador=longitud_minima(LONGITUD_MINIMA_NOMBRE, "El nombre"),
         ),
-        definir_campo("telefono", "Teléfono", valor=valor("telefono"), icono=ft.Icons.PHONE),
+        definir_campo("telefono", "Teléfono", campo_telefono, valor=valor("telefono")),
         definir_campo(
             "direccion", "Dirección", valor=valor("direccion"), icono=ft.Icons.LOCATION_ON
         ),

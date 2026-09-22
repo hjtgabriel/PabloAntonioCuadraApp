@@ -40,7 +40,7 @@ from tema import (
     estilo_boton,
 )
 from vistas.componentes.busqueda import BarraBusqueda
-from vistas.componentes.campos import campo_decimal
+from vistas.componentes.campos import campo_decimal, encadenar_al_cambiar
 from vistas.componentes.dialogos import DialogoInformacion
 from vistas.componentes.layout import encabezado, estado_vacio
 from vistas.componentes.notificaciones import (
@@ -80,8 +80,8 @@ class PuntoDeVenta:
 
         self._total = ft.Text(size=TEXTO_TITULO, weight=ft.FontWeight.BOLD, color=TEXTO)
         self._cambio = ft.Text(size=TEXTO_SUBTITULO, color=EXITO)
-        self._efectivo = campo_decimal("Efectivo recibido", valor="")
-        self._efectivo.on_change = self._al_cambiar_efectivo
+        self._efectivo = campo_decimal("Efectivo recibido", valor="", filtrar_entrada=False)
+        encadenar_al_cambiar(self._efectivo, self._al_cambiar_efectivo)
 
     def construir(self) -> ft.Control:
         """
@@ -372,8 +372,8 @@ class PuntoDeVenta:
     def _al_cambiar_efectivo(self, _evento: ft.ControlEvent) -> None:
         """Recalcula el cambio mientras el usuario escribe el efectivo."""
         self._actualizar_totales()
-        self._total.update()
-        self._cambio.update()
+        refrescar(self._total)
+        refrescar(self._cambio)
 
     def _cobrar(self, _evento: ft.ControlEvent) -> None:
         """Registra la venta y muestra el comprobante (RF04, RF09, RF10)."""
