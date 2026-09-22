@@ -24,14 +24,22 @@ Validador = Callable[[str], str | None]
 """Función que recibe el valor y devuelve un mensaje de error, o None si está bien."""
 
 PATRON_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-PATRON_SOLO_DIGITOS = re.compile(r"^\d+$")
+PATRON_TELEFONO = re.compile(r"^\d+(-\d+)*$")
+"""
+Dígitos, opcionalmente separados por guiones simples.
+
+El guion se admite porque es como se anotan los teléfonos en el local
+(«8676-7203»). Lo que no se admite es cualquier otra cosa: letras,
+espacios, paréntesis o el signo «+», que harían que el mismo número
+quedara guardado de formas distintas según quién lo escriba.
+"""
 
 # Los avisos van debajo del campo, que en el punto de venta mide unos 300 px.
 # Un texto más largo se corta con puntos suspensivos y deja al usuario sin
 # saber qué corregir, así que se redactan cortos a propósito.
 
 MENSAJE_SOLO_NUMEROS_POSITIVOS = "Formato inválido: solo números positivos"
-MENSAJE_SOLO_DIGITOS = "Solo números: sin letras, guiones ni símbolos"
+MENSAJE_TELEFONO = "Solo números y guiones, sin letras ni símbolos"
 LONGITUD_MINIMA_TELEFONO = 7
 LONGITUD_MAXIMA_TELEFONO = 15
 
@@ -354,9 +362,10 @@ def _validador_telefono(obligatorio: bool) -> Validador:
     """
     Construye el validador de un número de teléfono.
 
-    Exige dígitos y nada más. Un guion o un espacio parecen inofensivos, pero
-    el teléfono se guarda tal como se escribe y después nadie puede buscarlo ni
-    marcarlo de forma fiable si cada quien lo anota a su manera.
+    Admite dígitos y el guion como separador, que es como se anotan los
+    teléfonos en el local. Rechaza el resto —letras, espacios, paréntesis, el
+    signo «+»— porque el teléfono se guarda tal como se escribe: si cada quien
+    lo anota a su manera, después nadie puede buscarlo de forma fiable.
 
     Args:
         obligatorio: Si el campo no puede quedar vacío.
@@ -378,11 +387,14 @@ def _validador_telefono(obligatorio: bool) -> Validador:
         texto = (valor or "").strip()
         if not texto:
             return "Este campo es obligatorio" if obligatorio else None
-        if not PATRON_SOLO_DIGITOS.match(texto):
-            return MENSAJE_SOLO_DIGITOS
-        if len(texto) < LONGITUD_MINIMA_TELEFONO:
+        if not PATRON_TELEFONO.match(texto):
+            return MENSAJE_TELEFONO
+
+        # Los guiones separan, no cuentan como parte del número.
+        digitos = texto.replace("-", "")
+        if len(digitos) < LONGITUD_MINIMA_TELEFONO:
             return f"El teléfono debe tener al menos {LONGITUD_MINIMA_TELEFONO} dígitos"
-        if len(texto) > LONGITUD_MAXIMA_TELEFONO:
+        if len(digitos) > LONGITUD_MAXIMA_TELEFONO:
             return f"El teléfono no puede pasar de {LONGITUD_MAXIMA_TELEFONO} dígitos"
         return None
 

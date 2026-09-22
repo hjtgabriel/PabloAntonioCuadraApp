@@ -113,13 +113,14 @@ Los campos avisan en el momento, debajo del propio campo y en rojo:
   importe negativo, aparece «Formato inválido: solo números positivos». El
   campo deja escribir para poder explicar qué está mal: bloquear la tecla en
   silencio no le dice al cajero por qué no pasa nada.
-- **Teléfono** (empleados, usuarios y proveedores). Solo admite dígitos, entre
-  7 y 15. Si escribe letras, guiones, espacios o paréntesis, aparece «Solo
-  números: sin letras, guiones ni símbolos». Guardar todos los teléfonos con
-  el mismo formato es lo que permite buscarlos después.
+- **Teléfono** (empleados, usuarios y proveedores). Admite dígitos y el guion
+  como separador, entre 7 y 15 cifras: `8676-7203` y `86767203` son válidos.
+  Si escribe letras, espacios, paréntesis o el signo `+`, aparece «Solo números
+  y guiones, sin letras ni símbolos».
 
-> Si tiene teléfonos antiguos escritos con guiones, al editar ese registro el
-> campo los marcará. Quite el guion y guarde: el número queda normalizado.
+> Se admite el guion y solo el guion. Permitir además espacios o paréntesis
+> haría que el mismo número quedara guardado de varias formas y nadie pudiera
+> buscarlo después.
 
 ### 2.2.1. La factura
 

@@ -17,8 +17,8 @@ LARGO_MAXIMO_AVISO = 46
 """Caracteres que caben bajo un campo estrecho sin que el aviso se corte."""
 
 from vistas.componentes.campos import (  # noqa: E402
-    MENSAJE_SOLO_DIGITOS,
     MENSAJE_SOLO_NUMEROS_POSITIVOS,
+    MENSAJE_TELEFONO,
     campo_decimal,
     campo_telefono,
     campo_texto,
@@ -86,7 +86,7 @@ def test_el_aviso_del_efectivo_explica_que_se_espera():
 
 
 @pytest.mark.parametrize(
-    "mensaje", [MENSAJE_SOLO_NUMEROS_POSITIVOS, MENSAJE_SOLO_DIGITOS]
+    "mensaje", [MENSAJE_SOLO_NUMEROS_POSITIVOS, MENSAJE_TELEFONO]
 )
 def test_los_avisos_caben_bajo_el_campo(mensaje):
     """
@@ -145,12 +145,33 @@ def test_encadenar_funciona_en_un_campo_sin_validador():
 # ── Teléfono: solo dígitos ──────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("texto", ["8676-7203", "8676 7203", "+505 86767203", "(505)86767203"])
-def test_el_telefono_rechaza_guiones_y_simbolos(texto):
-    """El número se guarda tal como se escribe; hay que unificar el formato."""
+@pytest.mark.parametrize("texto", ["8676-7203", "505-8676-7203", "86767203"])
+def test_el_telefono_acepta_el_guion_como_separador(texto):
+    """Es como se anotan los teléfonos en el local."""
     campo = campo_telefono()
 
-    assert error_al_escribir(campo, texto) == MENSAJE_SOLO_DIGITOS
+    assert error_al_escribir(campo, texto) is None
+
+
+@pytest.mark.parametrize("texto", ["8676 7203", "+505 86767203", "(505)86767203", "8676.7203"])
+def test_el_telefono_rechaza_otros_separadores(texto):
+    """
+    Se admite el guion y solo el guion.
+
+    Dejar entrar espacios, paréntesis o «+» haría que el mismo número quedara
+    guardado de varias formas y nadie pudiera buscarlo después.
+    """
+    campo = campo_telefono()
+
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
+
+
+@pytest.mark.parametrize("texto", ["-86767203", "86767203-", "8676--7203"])
+def test_el_telefono_rechaza_guiones_mal_puestos(texto):
+    """Un guion separa dos grupos de cifras; suelto o doble es un error."""
+    campo = campo_telefono()
+
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
 
 
 @pytest.mark.parametrize("texto", ["ocho seis", "86767203a", "abc", "N/A"])
@@ -158,15 +179,26 @@ def test_el_telefono_rechaza_letras(texto):
     """Es la regla que pidió la librería: solo números."""
     campo = campo_telefono()
 
-    assert error_al_escribir(campo, texto) == MENSAJE_SOLO_DIGITOS
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
 
 
 @pytest.mark.parametrize("texto", ["86767203", "22334455", "50586767203"])
 def test_el_telefono_acepta_solo_digitos(texto):
-    """Un número bien escrito debe pasar."""
+    """Un número sin separadores también es válido."""
     campo = campo_telefono()
 
     assert error_al_escribir(campo, texto) is None
+
+
+def test_los_guiones_no_cuentan_como_digitos():
+    """
+    «123-45» tiene cinco cifras, no seis: sigue siendo demasiado corto.
+
+    Si el guion contara, un número incompleto pasaría la comprobación solo por
+    llevar separadores.
+    """
+    assert error_al_escribir(campo_telefono(), "123-45") is not None
+    assert error_al_escribir(campo_telefono(), "8676-7203") is None
 
 
 def test_el_telefono_puede_quedar_vacio():
@@ -196,8 +228,18 @@ def test_el_telefono_rechaza_numeros_absurdamente_largos():
 
 def test_el_aviso_del_telefono_nombra_lo_que_no_se_admite():
     """El usuario debe entender qué quitar sin adivinar."""
-    assert "letras" in MENSAJE_SOLO_DIGITOS
-    assert "guiones" in MENSAJE_SOLO_DIGITOS
+    assert "letras" in MENSAJE_TELEFONO
+    assert "guiones" in MENSAJE_TELEFONO
+
+
+def test_el_telefono_guardado_en_la_libreria_es_valido():
+    """
+    El formato que ya se usa en el local debe seguir siendo válido.
+
+    La primera versión de esta regla rechazaba el guion, y el teléfono de una
+    empleada ya registrada quedaba marcado como inválido al editarla.
+    """
+    assert error_al_escribir(campo_telefono(), "8676-7203") is None
 
 
 # ── Los formularios usan el campo validado ──────────────────────────────
@@ -210,7 +252,8 @@ def test_el_formulario_de_empleado_valida_el_telefono(base_datos):
 
     telefono = buscar(_campos_persona(None), "telefono").control
 
-    assert error_al_escribir(telefono, "8676-7203") == MENSAJE_SOLO_DIGITOS
+    assert error_al_escribir(telefono, "ocho seis") == MENSAJE_TELEFONO
+    assert error_al_escribir(telefono, "8676-7203") is None
 
 
 def test_el_punto_de_venta_valida_el_efectivo(base_datos):
