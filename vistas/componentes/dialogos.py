@@ -231,21 +231,55 @@ class DialogoFormulario(DialogoBase):
 
     def _recoger_valores(self) -> dict | None:
         """
-        Reúne los valores del formulario comprobando los obligatorios.
+        Reúne los valores del formulario comprobando que se puedan guardar.
+
+        Un campo puede estar lleno y aun así ser inválido. Antes solo se
+        miraban los obligatorios, de modo que un teléfono mal escrito mostraba
+        su aviso en rojo y se guardaba igual al pulsar «Guardar»: el aviso era
+        decorativo.
 
         Returns:
-            Los valores por clave, o None si falta algún campo obligatorio.
+            Los valores por clave, o None si algún campo impide guardar. El
+            motivo queda visible dentro del diálogo.
         """
         datos: dict = {}
         for campo in self._campos:
             valor = getattr(campo.control, "value", None)
+
             if campo.obligatorio and not str(valor or "").strip():
                 self._mostrar_error(f"«{campo.etiqueta}» es obligatorio")
                 return None
+
+            problema = self._revisar(campo)
+            if problema is not None:
+                self._mostrar_error(f"«{campo.etiqueta}»: {problema}")
+                return None
+
             datos[campo.clave] = valor.strip() if isinstance(valor, str) else valor
 
         self._ocultar_error()
         return datos
+
+    @staticmethod
+    def _revisar(campo: Campo) -> str | None:
+        """
+        Vuelve a pasar la validación del campo antes de guardar.
+
+        No basta con mirar el error que ya tuviera el control: si el usuario
+        pega un valor o el campo nunca recibió un evento de cambio, ese error
+        estaría en blanco aunque el contenido sea inválido.
+
+        Args:
+            campo: Campo del formulario a revisar.
+
+        Returns:
+            El motivo por el que no se puede guardar, o None si está correcto.
+        """
+        control = campo.control
+        validador = getattr(control, "validador", None)
+        if validador is not None:
+            return validador(getattr(control, "value", "") or "")
+        return getattr(control, "error", None)
 
     def _mostrar_error(self, mensaje: str) -> None:
         """

@@ -6,6 +6,7 @@ from modulos.proveedores.modelos import Proveedor
 from modulos.proveedores.repositorio import ProveedorRepositorio
 from nucleo.base_datos import Conexion
 from nucleo.errores import ErrorDuplicado, ErrorEnUso, ErrorNoEncontrado, ErrorValidacion
+from nucleo.validacion import revisar_telefono
 
 LONGITUD_MINIMA_NOMBRE = 2
 
@@ -57,7 +58,7 @@ class ServicioProveedores:
             Proveedor(
                 idproveedor=0,
                 nombreproveedor=limpio,
-                telefono=_texto_opcional(telefono),
+                telefono=_telefono_valido(telefono),
                 direccion=_texto_opcional(direccion),
             )
         )
@@ -90,7 +91,7 @@ class ServicioProveedores:
         actualizado = Proveedor(
             idproveedor=idproveedor,
             nombreproveedor=nombre,
-            telefono=_texto_opcional(datos.get("telefono", actual.telefono)),
+            telefono=_telefono_valido(datos.get("telefono", actual.telefono)),
             direccion=_texto_opcional(datos.get("direccion", actual.direccion)),
         )
         return self._repositorio.actualizar(idproveedor, actualizado)
@@ -135,6 +136,30 @@ class ServicioProveedores:
                 f"El nombre del proveedor debe tener al menos {LONGITUD_MINIMA_NOMBRE} caracteres"
             )
         return limpio
+
+
+def _telefono_valido(valor: object) -> str | None:
+    """
+    Normaliza y comprueba un teléfono antes de guardarlo.
+
+    La pantalla ya avisa mientras se escribe, pero esa comprobación no protege
+    los datos: quien llame al servicio desde otro sitio se la saltaría. La
+    regla es la misma en ambas capas porque vive en :mod:`nucleo.validacion`.
+
+    Args:
+        valor: Teléfono recibido de la interfaz.
+
+    Returns:
+        El teléfono sin espacios sobrantes, o None si venía vacío.
+
+    Raises:
+        ErrorValidacion: Si el formato o el largo no son válidos.
+    """
+    limpio = _texto_opcional(valor)
+    problema = revisar_telefono(limpio)
+    if problema is not None:
+        raise ErrorValidacion(problema)
+    return limpio
 
 
 def _texto_opcional(valor: str | None) -> str | None:

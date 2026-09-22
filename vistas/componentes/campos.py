@@ -17,6 +17,7 @@ from decimal import Decimal, InvalidOperation
 
 import flet as ft
 
+from nucleo.validacion import revisar_telefono
 from tema import ACENTO, BORDE, SUPERFICIE, TEXTO_NORMAL
 from vistas.componentes.refresco import refrescar
 
@@ -24,24 +25,7 @@ Validador = Callable[[str], str | None]
 """Función que recibe el valor y devuelve un mensaje de error, o None si está bien."""
 
 PATRON_FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-PATRON_TELEFONO = re.compile(r"^\d+(-\d+)*$")
-"""
-Dígitos, opcionalmente separados por guiones simples.
-
-El guion se admite porque es como se anotan los teléfonos en el local
-(«8676-7203»). Lo que no se admite es cualquier otra cosa: letras,
-espacios, paréntesis o el signo «+», que harían que el mismo número
-quedara guardado de formas distintas según quién lo escriba.
-"""
-
-# Los avisos van debajo del campo, que en el punto de venta mide unos 300 px.
-# Un texto más largo se corta con puntos suspensivos y deja al usuario sin
-# saber qué corregir, así que se redactan cortos a propósito.
-
 MENSAJE_SOLO_NUMEROS_POSITIVOS = "Formato inválido: solo números positivos"
-MENSAJE_TELEFONO = "Solo números y guiones, sin letras ni símbolos"
-LONGITUD_MINIMA_TELEFONO = 7
-LONGITUD_MAXIMA_TELEFONO = 15
 
 
 def campo_texto(
@@ -362,10 +346,8 @@ def _validador_telefono(obligatorio: bool) -> Validador:
     """
     Construye el validador de un número de teléfono.
 
-    Admite dígitos y el guion como separador, que es como se anotan los
-    teléfonos en el local. Rechaza el resto —letras, espacios, paréntesis, el
-    signo «+»— porque el teléfono se guarda tal como se escribe: si cada quien
-    lo anota a su manera, después nadie puede buscarlo de forma fiable.
+    La regla vive en :mod:`nucleo.validacion` porque el servicio la aplica
+    también al guardar: si cada capa llevara la suya, podrían discrepar.
 
     Args:
         obligatorio: Si el campo no puede quedar vacío.
@@ -376,7 +358,7 @@ def _validador_telefono(obligatorio: bool) -> Validador:
 
     def validar(valor: str) -> str | None:
         """
-        Comprueba que el texto sean solo dígitos y de un largo razonable.
+        Comprueba el teléfono con la regla compartida.
 
         Args:
             valor: Texto escrito en el campo.
@@ -384,19 +366,7 @@ def _validador_telefono(obligatorio: bool) -> Validador:
         Returns:
             El mensaje de error, o None si el teléfono es aceptable.
         """
-        texto = (valor or "").strip()
-        if not texto:
-            return "Este campo es obligatorio" if obligatorio else None
-        if not PATRON_TELEFONO.match(texto):
-            return MENSAJE_TELEFONO
-
-        # Los guiones separan, no cuentan como parte del número.
-        digitos = texto.replace("-", "")
-        if len(digitos) < LONGITUD_MINIMA_TELEFONO:
-            return f"El teléfono debe tener al menos {LONGITUD_MINIMA_TELEFONO} dígitos"
-        if len(digitos) > LONGITUD_MAXIMA_TELEFONO:
-            return f"El teléfono no puede pasar de {LONGITUD_MAXIMA_TELEFONO} dígitos"
-        return None
+        return revisar_telefono(valor, obligatorio)
 
     return validar
 
@@ -517,6 +487,9 @@ def _conectar_validador(campo: ft.TextField, validador: Validador) -> None:
     """
     Hace que el campo se valide solo mientras el usuario escribe.
 
+    Deja además el validador colgado del propio control, para que el diálogo
+    pueda volver a ejecutarlo al guardar sin tener que conocer qué campo es.
+
     Args:
         campo: Campo al que conectar la validación.
         validador: Comprobación a aplicar.
@@ -534,3 +507,8 @@ def _conectar_validador(campo: ft.TextField, validador: Validador) -> None:
         refrescar(control)
 
     campo.on_change = al_escribir
+
+    # El diálogo lo vuelve a ejecutar antes de guardar: el error visible puede
+    # estar en blanco si el usuario pegó el valor o nunca tecleó en el campo,
+    # y un formulario inválido no debe poder guardarse por ese resquicio.
+    campo.validador = validador

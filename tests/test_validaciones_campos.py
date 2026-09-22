@@ -16,9 +16,13 @@ import pytest
 LARGO_MAXIMO_AVISO = 46
 """Caracteres que caben bajo un campo estrecho sin que el aviso se corte."""
 
+from nucleo.validacion import (  # noqa: E402
+    DIGITOS_TELEFONO,
+    MENSAJE_TELEFONO_FORMATO,
+    MENSAJE_TELEFONO_LARGO,
+)
 from vistas.componentes.campos import (  # noqa: E402
     MENSAJE_SOLO_NUMEROS_POSITIVOS,
-    MENSAJE_TELEFONO,
     campo_decimal,
     campo_telefono,
     campo_texto,
@@ -86,7 +90,7 @@ def test_el_aviso_del_efectivo_explica_que_se_espera():
 
 
 @pytest.mark.parametrize(
-    "mensaje", [MENSAJE_SOLO_NUMEROS_POSITIVOS, MENSAJE_TELEFONO]
+    "mensaje", [MENSAJE_SOLO_NUMEROS_POSITIVOS, MENSAJE_TELEFONO_FORMATO]
 )
 def test_los_avisos_caben_bajo_el_campo(mensaje):
     """
@@ -145,7 +149,7 @@ def test_encadenar_funciona_en_un_campo_sin_validador():
 # ── Teléfono: solo dígitos ──────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("texto", ["8676-7203", "505-8676-7203", "86767203"])
+@pytest.mark.parametrize("texto", ["8676-7203", "8-676-7203", "86767203"])
 def test_el_telefono_acepta_el_guion_como_separador(texto):
     """Es como se anotan los teléfonos en el local."""
     campo = campo_telefono()
@@ -163,7 +167,7 @@ def test_el_telefono_rechaza_otros_separadores(texto):
     """
     campo = campo_telefono()
 
-    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO_FORMATO
 
 
 @pytest.mark.parametrize("texto", ["-86767203", "86767203-", "8676--7203"])
@@ -171,7 +175,7 @@ def test_el_telefono_rechaza_guiones_mal_puestos(texto):
     """Un guion separa dos grupos de cifras; suelto o doble es un error."""
     campo = campo_telefono()
 
-    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO_FORMATO
 
 
 @pytest.mark.parametrize("texto", ["ocho seis", "86767203a", "abc", "N/A"])
@@ -179,10 +183,10 @@ def test_el_telefono_rechaza_letras(texto):
     """Es la regla que pidió la librería: solo números."""
     campo = campo_telefono()
 
-    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO
+    assert error_al_escribir(campo, texto) == MENSAJE_TELEFONO_FORMATO
 
 
-@pytest.mark.parametrize("texto", ["86767203", "22334455", "50586767203"])
+@pytest.mark.parametrize("texto", ["86767203", "22334455", "88112233"])
 def test_el_telefono_acepta_solo_digitos(texto):
     """Un número sin separadores también es válido."""
     campo = campo_telefono()
@@ -197,7 +201,7 @@ def test_los_guiones_no_cuentan_como_digitos():
     Si el guion contara, un número incompleto pasaría la comprobación solo por
     llevar separadores.
     """
-    assert error_al_escribir(campo_telefono(), "123-45") is not None
+    assert error_al_escribir(campo_telefono(), "123-45") == MENSAJE_TELEFONO_LARGO
     assert error_al_escribir(campo_telefono(), "8676-7203") is None
 
 
@@ -213,23 +217,26 @@ def test_el_telefono_obligatorio_si_lo_exige_avisa():
     assert error_al_escribir(campo, "") is not None
 
 
-@pytest.mark.parametrize("texto", ["123", "12345"])
-def test_el_telefono_rechaza_numeros_demasiado_cortos(texto):
-    """Tres dígitos no son un teléfono: es un dato incompleto."""
-    campo = campo_telefono()
+@pytest.mark.parametrize("texto", ["123", "1234567", "123456789", "1" * 20])
+def test_el_telefono_exige_exactamente_ocho_digitos(texto):
+    """
+    Un teléfono de Nicaragua tiene ocho cifras: ni siete ni nueve.
 
-    assert error_al_escribir(campo, texto) is not None
+    Se comprueba por arriba y por abajo, porque un número incompleto y uno con
+    una cifra de más son el mismo error de tecleo visto de dos maneras.
+    """
+    assert error_al_escribir(campo_telefono(), texto) == MENSAJE_TELEFONO_LARGO
 
 
-def test_el_telefono_rechaza_numeros_absurdamente_largos():
-    """Un número de veinte cifras es un error de tecleo."""
-    assert error_al_escribir(campo_telefono(), "1" * 20) is not None
+def test_el_mensaje_de_largo_dice_cuantos_digitos_se_esperan():
+    """«Largo inválido» no ayuda; «debe tener 8 dígitos» sí."""
+    assert str(DIGITOS_TELEFONO) in MENSAJE_TELEFONO_LARGO
 
 
 def test_el_aviso_del_telefono_nombra_lo_que_no_se_admite():
     """El usuario debe entender qué quitar sin adivinar."""
-    assert "letras" in MENSAJE_TELEFONO
-    assert "guiones" in MENSAJE_TELEFONO
+    assert "letras" in MENSAJE_TELEFONO_FORMATO
+    assert "guiones" in MENSAJE_TELEFONO_FORMATO
 
 
 def test_el_telefono_guardado_en_la_libreria_es_valido():
@@ -252,7 +259,7 @@ def test_el_formulario_de_empleado_valida_el_telefono(base_datos):
 
     telefono = buscar(_campos_persona(None), "telefono").control
 
-    assert error_al_escribir(telefono, "ocho seis") == MENSAJE_TELEFONO
+    assert error_al_escribir(telefono, "ocho seis") == MENSAJE_TELEFONO_FORMATO
     assert error_al_escribir(telefono, "8676-7203") is None
 
 
@@ -275,3 +282,114 @@ def test_el_calculo_del_cambio_sigue_funcionando(base_datos):
     error_al_escribir(pantalla._efectivo, "500")
 
     assert pantalla._efectivo_escrito() == Decimal("500")
+
+
+# ── Un formato inválido no se puede guardar ─────────────────────────────
+
+
+def test_el_dialogo_no_guarda_un_telefono_invalido(base_datos, pagina):
+    """
+    El aviso en rojo no servía de nada: al pulsar «Guardar» se guardaba igual.
+
+    El diálogo solo comprobaba los campos obligatorios, así que un campo lleno
+    pero mal escrito pasaba sin más. Es el defecto que reportó la librería.
+    """
+    from vistas.componentes.dialogos import DialogoFormulario, definir_campo
+
+    guardados: list[dict] = []
+    campo = definir_campo("telefono", "Teléfono", campo_telefono)
+    dialogo = DialogoFormulario(pagina, "Prueba", [campo], guardados.append)
+
+    campo.control.value = "ocho seis siete"
+
+    assert dialogo._recoger_valores() is None
+    assert guardados == []
+
+
+def test_el_dialogo_explica_por_que_no_guarda(base_datos, pagina):
+    """Bloquear sin decir el motivo sería otro fallo silencioso."""
+    from vistas.componentes.dialogos import DialogoFormulario, definir_campo
+
+    campo = definir_campo("telefono", "Teléfono", campo_telefono)
+    dialogo = DialogoFormulario(pagina, "Prueba", [campo], lambda _datos: None)
+    campo.control.value = "123"
+
+    dialogo._recoger_valores()
+
+    assert dialogo._error.visible is True
+    assert "Teléfono" in dialogo._error.value
+
+
+def test_el_dialogo_guarda_lo_que_si_es_valido(base_datos, pagina):
+    """La comprobación no puede estorbar cuando el dato está bien."""
+    from vistas.componentes.dialogos import DialogoFormulario, definir_campo
+
+    campo = definir_campo("telefono", "Teléfono", campo_telefono)
+    dialogo = DialogoFormulario(pagina, "Prueba", [campo], lambda _datos: None)
+    campo.control.value = "8676-7203"
+
+    assert dialogo._recoger_valores() == {"telefono": "8676-7203"}
+
+
+def test_el_dialogo_detecta_un_valor_pegado_sin_teclear(base_datos, pagina):
+    """
+    Pegar un valor no dispara el evento de cambio, así que no habría aviso.
+
+    Por eso la comprobación al guardar vuelve a ejecutar el validador en vez de
+    limitarse a mirar el error que el control tuviera pintado.
+    """
+    from vistas.componentes.dialogos import DialogoFormulario, definir_campo
+
+    campo = definir_campo("telefono", "Teléfono", campo_telefono)
+    dialogo = DialogoFormulario(pagina, "Prueba", [campo], lambda _datos: None)
+    campo.control.value = "(505) 8676 7203"
+
+    assert campo.control.error is None, "el control no llegó a marcar el error"
+    assert dialogo._recoger_valores() is None, "y aun así no debe guardarse"
+
+
+# ── El servicio tampoco lo acepta ───────────────────────────────────────
+
+
+@pytest.mark.parametrize("telefono", ["ocho seis", "123", "8676 7203", "123456789"])
+def test_el_servicio_rechaza_un_telefono_invalido(base_datos, telefono):
+    """
+    Una regla que solo vive en la pantalla no protege los datos.
+
+    Cualquier otro llamador —un script, una importación, una pantalla nueva—
+    se la saltaría, así que el servicio la aplica también.
+    """
+    from modulos.personal.servicios import ServicioEmpleados
+    from nucleo.errores import ErrorValidacion
+
+    with pytest.raises(ErrorValidacion):
+        ServicioEmpleados().crear(
+            {"nombres": "Ana", "apellidos": "López", "telefono": telefono}
+        )
+
+
+def test_el_servicio_acepta_el_telefono_bien_escrito(base_datos):
+    """Con el formato correcto el alta debe completarse."""
+    from modulos.personal.servicios import ServicioEmpleados
+
+    idempleado = ServicioEmpleados().crear(
+        {"nombres": "Ana", "apellidos": "López", "telefono": "8676-7203"}
+    )
+
+    assert idempleado > 0
+
+
+def test_el_servicio_admite_dejar_el_telefono_vacio(base_datos):
+    """No todos los empleados tienen teléfono registrado."""
+    from modulos.personal.servicios import ServicioEmpleados
+
+    assert ServicioEmpleados().crear({"nombres": "Ana", "apellidos": "López"}) > 0
+
+
+def test_el_proveedor_tambien_valida_su_telefono(base_datos):
+    """Es el mismo dato: dejar uno sin validar sería un descuido."""
+    from modulos.proveedores.servicios import ServicioProveedores
+    from nucleo.errores import ErrorValidacion
+
+    with pytest.raises(ErrorValidacion):
+        ServicioProveedores().crear("Distribuidora Norte", telefono="no tengo")
