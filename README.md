@@ -58,8 +58,17 @@ python main.py
 
 ### 2.1. Entrar al sistema
 
-Escriba su usuario y su contraseña y pulse **Iniciar sesión**. Tras tres
-intentos fallidos el acceso se bloquea durante 30 segundos.
+Escriba su usuario y su contraseña y pulse **Iniciar sesión**.
+
+Una contraseña incorrecta **nunca da acceso**, se intente lo que se intente. El
+sistema tolera **5 intentos fallidos**; a partir del segundo avisa cuántos
+quedan, y agotados los cinco cierra el acceso a ese usuario durante 30
+segundos. Durante el bloqueo no entra ni con la contraseña correcta: si
+bastara acertarla justo después del quinto fallo, el límite no frenaría nada.
+
+El conteo es por usuario, así que bloquear a quien teclea mal no deja fuera al
+resto del personal. El límite lo aplica el servicio de autenticación y no la
+pantalla: una regla de seguridad no puede depender de que la interfaz coopere.
 
 Lo que vea en el menú depende de su rol:
 

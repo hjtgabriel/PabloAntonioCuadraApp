@@ -190,3 +190,81 @@ def test_un_hash_con_pocas_iteraciones_se_rechaza():
 def test_el_piso_de_iteraciones_es_razonable():
     """Un piso demasiado bajo no protegería de nada."""
     assert ITERACIONES_MINIMAS >= 100_000
+
+
+# ── El usuario sabe cuántos intentos le quedan ──────────────────────────
+
+
+def test_el_aviso_cuenta_los_intentos_que_quedan(usuario):
+    """
+    El bloqueo no debe llegar por sorpresa al quinto intento.
+
+    Antes el mensaje era siempre el mismo y el acceso se cerraba de golpe, sin
+    que el cajero supiera que se estaba quedando sin oportunidades.
+    """
+    servicio = ServicioAutenticacion(control=ControlDeIntentos())
+
+    with pytest.raises(ErrorAutenticacion, match="Le quedan 4 intentos"):
+        servicio.iniciar_sesion("ana", "clave-equivocada")
+    with pytest.raises(ErrorAutenticacion, match="Le quedan 3 intentos"):
+        servicio.iniciar_sesion("ana", "clave-equivocada")
+
+
+def test_el_ultimo_intento_se_avisa_en_singular(usuario):
+    """«Le queda 1 intentos» delataría que el texto se arma sin cuidado."""
+    servicio = ServicioAutenticacion(control=ControlDeIntentos())
+
+    for _ in range(INTENTOS_ANTES_DE_BLOQUEAR - 2):
+        with pytest.raises(ErrorAutenticacion):
+            servicio.iniciar_sesion("ana", "clave-equivocada")
+
+    with pytest.raises(ErrorAutenticacion, match="Es su último intento"):
+        servicio.iniciar_sesion("ana", "clave-equivocada")
+
+
+def test_el_conteo_no_revela_si_el_usuario_existe(usuario):
+    """
+    Un usuario inexistente debe agotar intentos igual que uno real.
+
+    Si solo se contaran los fallos de usuarios existentes, el aviso diría al
+    atacante cuáles están dados de alta.
+    """
+    real = ServicioAutenticacion(control=ControlDeIntentos())
+    falso = ServicioAutenticacion(control=ControlDeIntentos())
+
+    with pytest.raises(ErrorAutenticacion) as con_usuario:
+        real.iniciar_sesion("ana", "clave-equivocada")
+    with pytest.raises(ErrorAutenticacion) as sin_usuario:
+        falso.iniciar_sesion("no_existe", "clave-equivocada")
+
+    assert str(con_usuario.value) == str(sin_usuario.value)
+
+
+def test_la_clave_correcta_no_abre_durante_el_bloqueo(usuario):
+    """
+    Agotados los intentos, ni siquiera la contraseña buena debe servir.
+
+    Si la acertara justo después del quinto fallo, el límite no frenaría nada.
+    """
+    servicio = ServicioAutenticacion(control=ControlDeIntentos())
+
+    for _ in range(INTENTOS_ANTES_DE_BLOQUEAR):
+        with pytest.raises(ErrorAutenticacion):
+            servicio.iniciar_sesion("ana", "clave-equivocada")
+
+    with pytest.raises(ErrorAutenticacion, match="Demasiados intentos"):
+        servicio.iniciar_sesion("ana", CLAVE)
+
+
+def test_nunca_se_entra_con_credenciales_incorrectas(usuario):
+    """
+    La regla de fondo: una contraseña mala no da acceso, se intente lo que sea.
+
+    Se prueban variantes que suelen colarse en sistemas mal hechos: cadena
+    vacía, espacios, la clave con otra caja y el nombre de usuario repetido.
+    """
+    servicio = ServicioAutenticacion(control=ControlDeIntentos(intentos=9999))
+
+    for intento in ("", "   ", "CLAVE-SEGURA-1", "ana", "clave-segura", "clave-segura-12"):
+        with pytest.raises(ErrorAutenticacion):
+            servicio.iniciar_sesion("ana", intento)

@@ -117,6 +117,19 @@ class ControlDeIntentos:
         with self._candado:
             self._fallos.pop(usuario, None)
 
+    def restantes(self, usuario: str) -> int:
+        """
+        Cuenta los intentos que le quedan a un usuario antes del bloqueo.
+
+        Args:
+            usuario: Identificador de acceso.
+
+        Returns:
+            Intentos disponibles; cero si ya está bloqueado.
+        """
+        with self._candado:
+            return max(self._intentos - len(self._recientes(usuario)), 0)
+
     def _recientes(self, usuario: str) -> list[float]:
         """
         Descarta los intentos caducados y devuelve los que siguen contando.
@@ -156,6 +169,27 @@ class ServicioAutenticacion:
         self._repositorio = repositorio or UsuarioRepositorio(conexion)
         self._control = control or _intentos
 
+    def _aviso_de_fallo(self, usuario: str) -> str:
+        """
+        Redacta el aviso de credenciales incorrectas con los intentos que quedan.
+
+        Decirlo no revela nada: el conteo es idéntico exista o no el usuario,
+        porque el fallo se anota en ambos casos. Lo que sí evita es que el
+        bloqueo llegue por sorpresa al quinto intento.
+
+        Args:
+            usuario: Identificador de acceso con el que se intentó entrar.
+
+        Returns:
+            El mensaje a mostrar en la pantalla de acceso.
+        """
+        quedan = self._control.restantes(usuario)
+        if quedan <= 0:
+            return MENSAJE_CREDENCIALES
+        if quedan == 1:
+            return f"{MENSAJE_CREDENCIALES}. Es su último intento"
+        return f"{MENSAJE_CREDENCIALES}. Le quedan {quedan} intentos"
+
     def iniciar_sesion(self, nombreusuario: str, contrasena: str) -> UsuarioAutenticado:
         """
         Valida las credenciales y devuelve los datos de sesión (RF01).
@@ -185,7 +219,7 @@ class ServicioAutenticacion:
         if credencial is None or not coincide:
             self._control.anotar_fallo(usuario_limpio)
             logger.warning("Intento de acceso fallido para el usuario «%s»", usuario_limpio)
-            raise ErrorAutenticacion(MENSAJE_CREDENCIALES)
+            raise ErrorAutenticacion(self._aviso_de_fallo(usuario_limpio))
 
         self._control.limpiar(usuario_limpio)
         logger.info(

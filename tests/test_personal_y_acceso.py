@@ -71,14 +71,35 @@ def test_el_mensaje_de_error_no_revela_si_el_usuario_existe(usuario_admin):
     Si difiriera, alguien podría averiguar qué identificadores existen probando
     nombres al azar.
     """
-    servicio = ServicioAutenticacion()
+    from modulos.auth.servicios import ControlDeIntentos
 
-    with pytest.raises(ErrorAutenticacion) as sin_usuario:
-        servicio.iniciar_sesion("no-existe", "x")
-    with pytest.raises(ErrorAutenticacion) as clave_mala:
-        servicio.iniciar_sesion("admin", "x")
+    def mensaje(nombre: str, intentos: int) -> str:
+        """
+        Devuelve el aviso tras fallar «intentos» veces con ese nombre.
 
-    assert str(sin_usuario.value) == str(clave_mala.value)
+        Cada llamada parte de un contador propio: el mensaje incluye los
+        intentos restantes, así que comparar dos usuarios que van por distinto
+        número de fallos no diría nada sobre si existen.
+
+        Args:
+            nombre: Identificador con el que se intenta entrar.
+            intentos: Cuántas veces fallar antes de leer el mensaje.
+
+        Returns:
+            El texto del último aviso.
+        """
+        servicio = ServicioAutenticacion(control=ControlDeIntentos())
+        for _ in range(intentos - 1):
+            with pytest.raises(ErrorAutenticacion):
+                servicio.iniciar_sesion(nombre, "x")
+        with pytest.raises(ErrorAutenticacion) as fallo:
+            servicio.iniciar_sesion(nombre, "x")
+        return str(fallo.value)
+
+    # Se comprueba en varios puntos: el aviso cambia conforme se agotan los
+    # intentos, y en ninguno de ellos puede distinguir al usuario real.
+    for intento in (1, 3, 5):
+        assert mensaje("no-existe", intento) == mensaje("admin", intento)
 
 
 @pytest.mark.parametrize(("usuario", "clave"), [("", "x"), ("admin", ""), ("", "")])
